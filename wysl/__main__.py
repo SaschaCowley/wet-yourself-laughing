@@ -4,6 +4,7 @@ from wysl.setup import setup
 
 config = {}
 
+
 class WyslShell(cmd.Cmd):
     intro = f'{wysl.__name__}\nVersion {wysl.__version__}'
     prompt = '> '
@@ -13,9 +14,10 @@ class WyslShell(cmd.Cmd):
         setup(config)
 
     def do_exit(self, args):
-        "Exit the game. """
+        """Exit the game. """
         return True
 
 
 if __name__ == '__main__':
-    WyslShell().cmdloop()
+    #WyslShell().cmdloop()
+    setup(config)
