@@ -11,7 +11,7 @@ def game_loop():
     laughter_pipe_recv, laughter_pipe_send = mp.Pipe()
     expression_proc = mp.Process(
         target=expression_loop,
-        kwargs={"pipe": expression_pipe_send})
+        kwargs={"pipe": expression_pipe_send, "camera_index": 1})
     laughter_proc = mp.Process(
         target=laughter_loop,
         kwargs={"pipe": laughter_pipe_send})
@@ -21,6 +21,7 @@ def game_loop():
     laughter_proc.join(0)
     print("Hello from main game loop!")
     while expression_proc.is_alive() and laughter_proc.is_alive():
-        ready = mp.connection.wait([expression_pipe_recv, laughter_pipe_recv])
+        ready = mp.connection.wait(
+            [expression_pipe_recv, laughter_pipe_recv], 0)
         for pipe in ready:
             print(pipe.recv())
