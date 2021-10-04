@@ -1,3 +1,5 @@
+"""Setup component of the game."""
+
 from collections import namedtuple
 import cmd
 
@@ -146,15 +148,6 @@ def get_cameras():
         cap.release()
         port += 1
     return working_ports, available_ports
-
-
-def select_microphone(default=0):
-    microphones = get_microphones()
-
-    microphone = elicit_int(f'Microphone (default {default}): ', values=range(
-        len(microphones)), default=default)
-    return microphones[microphone].port
-
 
 def get_microphones():
     p = pyaudio.PyAudio()

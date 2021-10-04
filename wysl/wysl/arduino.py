@@ -1,0 +1,1 @@
+"""Arduino communication game component."""

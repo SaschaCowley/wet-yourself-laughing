@@ -1,6 +1,4 @@
-""" Wet Yourself Laughing
-
-"""
+"""Wet Yourself Laughing."""
 
 __name__ = "Wet Yourself Laughing"
 __version__ = "0.1.0"

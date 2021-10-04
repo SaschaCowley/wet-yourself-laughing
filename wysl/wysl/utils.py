@@ -1,7 +1,11 @@
+"""Utility functions."""
+
+
 def elicit_int(prompt="",
                values=None,
                err="Invalid input, try again",
                default=None):
+    """Prompt the user for an integer."""
     i = None
     while i is None:
         try:
