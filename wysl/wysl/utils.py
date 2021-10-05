@@ -1,5 +1,14 @@
 """Utility functions."""
 
+from typing import NamedTuple
+
+
+class ExpressionPayload(NamedTuple):
+    """Expression information payload."""
+
+    happy: float
+    surprise: float
+
 
 def elicit_int(prompt="",
                values=None,
