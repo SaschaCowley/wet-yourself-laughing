@@ -1,6 +1,7 @@
 """Utility functions."""
 
-from typing import NamedTuple
+from typing import NamedTuple, Iterable, Any
+from multiprocessing.connection import Connection
 
 
 class ExpressionPayload(NamedTuple):
@@ -8,6 +9,36 @@ class ExpressionPayload(NamedTuple):
 
     happy: float
     surprise: float
+
+    @classmethod
+    def from_fer_dict(cls, fer_dict):
+        """Create an ExpressionPayload object from an FER dictionary.
+
+        Args:
+            fer_dict (dict): Dict as returned by FER.
+
+        Returns:
+            ExpressionPayload: Equivalent expression payload object.
+        """
+        return cls(
+            happy=fer_dict['emotions']['happy'],
+            surprise=fer_dict['emotions']['surprise']
+        )
+
+
+def bcast(cons: Iterable[Connection], msg: Any) -> None:
+    """Send a message to multiple pipes.
+
+    Args:
+        cons (Iterable[Connection]): The multiprocessing Connection objects to
+            which to broadcast the message.
+        msg (Any): The message to broadcast.
+
+    Returns:
+        None
+    """
+    for con in cons:
+        con.send(msg)
 
 
 def elicit_int(prompt="",

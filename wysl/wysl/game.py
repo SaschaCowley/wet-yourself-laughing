@@ -4,24 +4,27 @@ import logging
 import multiprocessing as mp
 import threading
 from queue import SimpleQueue
-
+from .exceptions import UserTerminationException, CameraError
 from .enums import CommandEnum, StatusEnum
 from .expression import expression_loop
 from .laughter import laughter_loop
 
+
 logger = mp.log_to_stderr()
 logger.setLevel(1)
 input_queue: SimpleQueue[str] = SimpleQueue()
+local_pipes: list[mp.connection.Connection]
 
 
 def game_loop() -> None:
-    """Main game loop."""
-    global input_queue
+    """Run the primary game loop."""
+    global input_queue, local_pipes
     kb_thread = threading.Thread(
         target=keyboard_loop, name="KeyboardThread", daemon=True)
     kb_thread.start()
     expression_pipe_local, expression_pipe_remote = mp.Pipe()
     laughter_pipe_local, laughter_pipe_remote = mp.Pipe()
+    local_pipes = [expression_pipe_local, laughter_pipe_local]
     expression_proc = mp.Process(
         name="ExpressionProcess",
         target=expression_loop,
@@ -30,32 +33,62 @@ def game_loop() -> None:
         name="LaughterProcess",
         target=laughter_loop,
         kwargs={"pipe": laughter_pipe_remote})
-    local_pipes: list[mp.connection.Connection] = [
-        expression_pipe_local, laughter_pipe_local]
     # processes: list[mp.Process] = [expression_proc, laughter_proc]
-    expression_proc.start()
-    expression_proc.join(0)
+    # expression_proc.start()
+    # expression_proc.join(0)
     laughter_proc.start()
     laughter_proc.join(0)
     print("Hello from main game loop!")
     while True:
-        ready = mp.connection.wait(local_pipes, 0)
-        for pipe in ready:
-            #if not isinstance(pipe, mp.connection.Connection):
-                #continue
-            payload = pipe.recv()
-            logger.info(f'Received from {pipe}: {payload}')
-            if payload is StatusEnum.CAMERA_ERROR:
-                logger.error("Problem with the camera.")
-            # print(payload)
+        try:
+            handle_ipc_recv()
+            handle_keyboard_input()
 
-        if not input_queue.empty():
-            payload = input_queue.get()
-            logger.info(f'Received input: {payload}')
-            if payload == 'quit':
-                expression_pipe_local.send(CommandEnum.TERMINATE)
+        except CameraError:
+            logger.info("Shutting down due to camera error.")
+            break
+
+        except UserTerminationException:
+            logger.info("Shutting down at user request.")
+            break
+
         if not (expression_proc.is_alive() or laughter_proc.is_alive()):
             break
+
+    shutdown()
+
+
+def handle_ipc_recv() -> None:
+    """Handle inter-process communication in the receive direction."""
+    ready = mp.connection.wait(local_pipes, 0)
+    for pipe in ready:
+        if not isinstance(pipe, (mp.connection.Connection,
+                                 mp.connection.PipeConnection)):
+            continue
+        payload = pipe.recv()
+        # logger.info(f'Received from {pipe}: {payload}')
+        if payload is StatusEnum.CAMERA_ERROR:
+            logger.error("Problem with the camera.")
+            raise CameraError
+
+
+def handle_keyboard_input() -> None:
+    """Handle user keyboard input."""
+    if not input_queue.empty():
+        payload = input_queue.get()
+        logger.info(f'Received input: {payload}')
+        if payload == 'quit':
+            raise UserTerminationException
+
+
+def shutdown() -> None:
+    """Shutdown the game."""
+    global local_pipes
+    for pipe in local_pipes:
+        try:
+            pipe.send(CommandEnum.TERMINATE)
+        except (OSError, BrokenPipeError):
+            continue
 
 
 def keyboard_loop() -> None:
