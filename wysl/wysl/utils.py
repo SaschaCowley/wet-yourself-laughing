@@ -1,7 +1,11 @@
 """Utility functions."""
 
-from typing import NamedTuple, Iterable, Any
+from __future__ import annotations
+
 from multiprocessing.connection import Connection
+from typing import Any, Iterable, NamedTuple
+
+from .types import FERDict
 
 
 class ExpressionPayload(NamedTuple):
@@ -11,7 +15,7 @@ class ExpressionPayload(NamedTuple):
     surprise: float
 
     @classmethod
-    def from_fer_dict(cls, fer_dict):
+    def from_fer_dict(cls, fer_dict: FERDict) -> ExpressionPayload:
         """Create an ExpressionPayload object from an FER dictionary.
 
         Args:
@@ -41,22 +45,22 @@ def bcast(cons: Iterable[Connection], msg: Any) -> None:
         con.send(msg)
 
 
-def elicit_int(prompt="",
-               values=None,
-               err="Invalid input, try again",
-               default=None):
-    """Prompt the user for an integer."""
-    i = None
-    while i is None:
-        try:
-            i = input(prompt).strip()
-            if i == "" and default is not None:
-                i = default
-            else:
-                i = int(i)
-            if i is not None and i not in values:
-                raise ValueError
-        except ValueError:
-            print(err)
-            i = None
-    return i
+# def elicit_int(prompt="",
+#                values=None,
+#                err="Invalid input, try again",
+#                default=None):
+#     """Prompt the user for an integer."""
+#     i = None
+#     while i is None:
+#         try:
+#             i = input(prompt).strip()
+#             if i == "" and default is not None:
+#                 i = default
+#             else:
+#                 i = int(i)
+#             if i is not None and i not in values:
+#                 raise ValueError
+#         except ValueError:
+#             print(err)
+#             i = None
+#     return i

@@ -1,14 +1,15 @@
 """Expression detection game component."""
 
-from fer import FER
-import cv2
-from .enums import StatusEnum, CommandEnum
-from .utils import ExpressionPayload
 import multiprocessing as mp
-from typing import Union
-from .exceptions import CameraError
 
-NullableExpressionPayload = Union[ExpressionPayload, None]
+import cv2
+from fer import FER
+
+from .enums import CommandEnum, StatusEnum
+from .exceptions import CameraError
+from .types import NullableExpressionPayload
+from .utils import ExpressionPayload
+
 logger = mp.get_logger()
 cap: cv2.VideoCapture
 detector: FER

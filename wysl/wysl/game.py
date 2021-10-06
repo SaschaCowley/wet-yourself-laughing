@@ -1,14 +1,14 @@
 """Game main process code."""
 
-import logging
+# import logging
 import multiprocessing as mp
 import threading
 from queue import SimpleQueue
-from .exceptions import UserTerminationException, CameraError
+
 from .enums import CommandEnum, StatusEnum
+from .exceptions import CameraError, UserTerminationException
 from .expression import expression_loop
 from .laughter import laughter_loop
-
 
 logger = mp.log_to_stderr()
 logger.setLevel(1)
