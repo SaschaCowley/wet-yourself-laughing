@@ -2,6 +2,7 @@
 
 # import logging
 import multiprocessing as mp
+from multiprocessing.connection import Connection, PipeConnection
 import threading
 from queue import SimpleQueue
 
@@ -13,7 +14,7 @@ from .laughter import laughter_loop
 logger = mp.log_to_stderr()
 logger.setLevel(1)
 input_queue: SimpleQueue[str] = SimpleQueue()
-local_pipes: list[mp.connection.Connection]
+local_pipes: list[Connection]
 
 
 def game_loop() -> None:
@@ -21,7 +22,6 @@ def game_loop() -> None:
     global input_queue, local_pipes
     kb_thread = threading.Thread(
         target=keyboard_loop, name="KeyboardThread", daemon=True)
-    kb_thread.start()
     expression_pipe_local, expression_pipe_remote = mp.Pipe()
     laughter_pipe_local, laughter_pipe_remote = mp.Pipe()
     local_pipes = [expression_pipe_local, laughter_pipe_local]
@@ -38,6 +38,7 @@ def game_loop() -> None:
     # expression_proc.join(0)
     laughter_proc.start()
     laughter_proc.join(0)
+    kb_thread.start()
     print("Hello from main game loop!")
     while True:
         try:
@@ -62,11 +63,10 @@ def handle_ipc_recv() -> None:
     """Handle inter-process communication in the receive direction."""
     ready = mp.connection.wait(local_pipes, 0)
     for pipe in ready:
-        if not isinstance(pipe, (mp.connection.Connection,
-                                 mp.connection.PipeConnection)):
+        if not isinstance(pipe, (Connection, PipeConnection)):
             continue
         payload = pipe.recv()
-        # logger.info(f'Received from {pipe}: {payload}')
+        logger.info(f'Received from {pipe}: {payload}')
         if payload is StatusEnum.CAMERA_ERROR:
             logger.error("Problem with the camera.")
             raise CameraError

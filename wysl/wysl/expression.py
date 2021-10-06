@@ -1,21 +1,21 @@
 """Expression detection game component."""
 
 import multiprocessing as mp
+from multiprocessing.connection import Connection
 
 import cv2
 from fer import FER
 
 from .enums import CommandEnum, StatusEnum
 from .exceptions import CameraError
-from .types import NullableExpressionPayload
-from .utils import ExpressionPayload
+from .utils import ExpressionPayload, NullableExpressionPayload
 
 logger = mp.get_logger()
 cap: cv2.VideoCapture
 detector: FER
 
 
-def expression_loop(pipe: mp.connection.Connection,
+def expression_loop(pipe: Connection,
                     camera_index: int = 0,
                     mtcnn: bool = False) -> None:
     """Expression detection loop."""

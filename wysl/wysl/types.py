@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TypedDict, Union
-
-from .utils import ExpressionPayload
+from typing import TypedDict
 
 
 class FERDict(TypedDict):
@@ -24,6 +22,3 @@ class FEREmotions(TypedDict):
     neutral: float
     sad: float
     surprise: float
-
-
-NullableExpressionPayload = Union[ExpressionPayload, None]
