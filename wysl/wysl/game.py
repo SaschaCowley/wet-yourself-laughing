@@ -70,6 +70,8 @@ def handle_ipc_recv() -> None:
         if payload is StatusEnum.CAMERA_ERROR:
             logger.error("Problem with the camera.")
             raise CameraError
+        elif payload is CommandEnum.TERMINATE:
+            raise UserTerminationException
 
 
 def handle_keyboard_input() -> None:

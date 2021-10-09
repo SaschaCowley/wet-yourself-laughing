@@ -25,6 +25,7 @@ rms_rect: Polygon
 recent_hits: deque[int]
 num_hits: int
 hit_volume: float
+running: bool
 
 
 def laughter_loop(pipe: Connection,
@@ -39,7 +40,7 @@ def laughter_loop(pipe: Connection,
                   hits: int = 5) -> None:
     """Laughter detection loop."""
     global audio, stream, chunk_size, fig, ax, waveform, sample_width,\
-        rms_rect, recent_hits, num_hits, hit_volume
+        rms_rect, recent_hits, num_hits, hit_volume, running
     chunk_size = int(rate/(1/chunk_duration))
     sample_width = width
     num_hits = hits
@@ -62,19 +63,25 @@ def laughter_loop(pipe: Connection,
     ax.set_ylim(-(2**(8*width))/2, (2**(8*width))/2)
     ax.set_title("Raw Audio Signal")
     plt.tight_layout()
+    fig.canvas.mpl_connect('close_event', figure_close)
     plt.show(block=False)
-    pipe.send("Hello from the laughter loop!")
     stream.start_stream()
-    while True:
+    running = True
+    while running:
         if pipe.poll(0):
             payload = pipe.recv()
             if payload == CommandEnum.TERMINATE:
                 break
+
         stat = detect_laughter()
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
         if stat:
             pipe.send(StatusEnum.LAUGHTER_DETECTED)
+
+
+    if not running:
+            pipe.send(CommandEnum.TERMINATE)
 
     plt.close('all')
     stream.stop_stream()
@@ -96,3 +103,8 @@ def detect_laughter() -> bool:
     stream.write(in_data)
     return (len(recent_hits) == recent_hits.maxlen) \
         and (recent_hits.count(True) == num_hits)
+
+
+def figure_close(event):
+    global running
+    running = False

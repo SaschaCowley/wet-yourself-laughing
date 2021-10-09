@@ -43,6 +43,7 @@ def expression_loop(pipe: Connection,
 
         if cv2.waitKey(1) == ord('q'):
             logger.info("Camera stream terminated by user.")
+            pipe.send(CommandEnum.TERMINATE)
             break
 
     cap.release()
