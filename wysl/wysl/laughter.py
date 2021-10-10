@@ -23,8 +23,8 @@ def laughter_loop(pipe: Connection,
                   channels: int = 1,
                   width: int = 2,
                   chunk_duration: float = 0.05,
-                  mean: float = 200.0,
-                  stddev: float = 240.0,
+                  mean: float = 400.0,
+                  stddev: float = 2400.0,
                   records: int = 10,
                   hits: int = 5) -> None:
     """Laughter detection loop."""
@@ -64,8 +64,7 @@ def laughter_loop(pipe: Connection,
             figure=fig, hit_volume=hit_volume, num_hits=hits)
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
-        if stat:
-            pipe.send(StatusEnum.LAUGHTER_DETECTED)
+        pipe.send(stat)
 
     if not running:
         pipe.send(CommandEnum.TERMINATE)
