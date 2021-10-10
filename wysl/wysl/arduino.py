@@ -21,11 +21,9 @@ def arduino_loop(queue: SimpleQueue[Union[StatusEnum, CommandEnum]],
         logger.error(e)
         queue.put(StatusEnum.SERIAL_ERROR)
         exit()
-    print("Hello from arduino thread!")
     while True:
         try:
             payload = queue.get(block=False)
-            print(f"Arduino thread got {payload}")
             if payload == CommandEnum.TERMINATE:
                 break
             elif payload == CommandEnum.CHANNEL_1_ON and channels[0] is False:

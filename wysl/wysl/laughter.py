@@ -2,6 +2,7 @@
 
 import audioop
 from collections import deque
+import multiprocessing as mp
 from multiprocessing.connection import Connection
 
 import matplotlib.pyplot as plt
@@ -12,7 +13,7 @@ from matplotlib.figure import Figure
 
 from .enums import CommandEnum, StatusEnum
 
-
+logger = mp.get_logger()
 recent_volumes: deque[float]
 running: bool
 
@@ -29,6 +30,7 @@ def laughter_loop(pipe: Connection,
                   hits: int = 5) -> None:
     """Laughter detection loop."""
     global recent_volumes, running
+    logger.debug(f"Starting: {locals()}")
     chunk_size = int(rate/(1/chunk_duration))
     hit_volume = mean+3*stddev
     recent_volumes = deque(maxlen=records)

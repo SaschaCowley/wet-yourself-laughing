@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, Mapping
+from queue import SimpleQueue
+from multiprocessing.connection import Connection
+from enum import Enum
 
 
 class FERDict(TypedDict):

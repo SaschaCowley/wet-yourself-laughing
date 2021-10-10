@@ -18,7 +18,7 @@ def expression_loop(pipe: Connection,
                     camera_index: int = 0,
                     mtcnn: bool = False) -> None:
     """Expression detection loop."""
-    logger.debug(f'Camera index: {camera_index}; mtcnn: {mtcnn}')
+    logger.debug(f"Starting: {locals()}")
     detector = FER(mtcnn=mtcnn, compile=True)
     cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
     if not cap.isOpened():

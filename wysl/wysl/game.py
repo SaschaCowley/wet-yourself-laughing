@@ -5,7 +5,7 @@ import multiprocessing as mp
 import threading
 from multiprocessing.connection import Connection, PipeConnection
 from queue import Empty, SimpleQueue
-from typing import Iterable, Union, Callable
+from typing import Mapping, Union, Protocol
 from functools import partial
 
 from .arduino import arduino_loop
@@ -15,19 +15,32 @@ from .exceptions import (CameraError, MicrophoneError, SerialError,
 from .expression import expression_loop
 from .laughter import laughter_loop
 
+Queues = Mapping[str, SimpleQueue[Union[CommandEnum, StatusEnum]]]
+Pipes = Mapping[str, Connection]
+
+
+class PartialSetChannel(Protocol):
+    """Type hint for set_arduino_channel."""
+
+    def __call__(_, channel: int, state: bool) -> None:
+        """Call, dummy."""
+        ...
+
 
 logger = mp.log_to_stderr()
-# logger.setLevel(1)
-input_queue: SimpleQueue[str] = SimpleQueue()
-local_pipes: list[Connection]
-set_arduino_channel: Callable[[int, bool], None]
+logger.setLevel(1)
+set_arduino_channel: PartialSetChannel
 
 
 def game_loop() -> None:
     """Run the primary game loop."""
-    global input_queue, local_pipes, set_arduino_channel
+    global set_arduino_channel
+    input_queue: SimpleQueue[str] = SimpleQueue()
     kb_thread = threading.Thread(
-        target=keyboard_loop, name="KeyboardThread", daemon=True)
+        target=keyboard_loop,
+        name="KeyboardThread",
+        daemon=True,
+        kwargs={"queue": input_queue})
     arduino_queue: SimpleQueue[Union[StatusEnum, CommandEnum]] = SimpleQueue()
     set_arduino_channel = partial(switch_channel, queue=arduino_queue)
     arduino_thread = threading.Thread(
@@ -36,8 +49,10 @@ def game_loop() -> None:
         kwargs={"queue": arduino_queue, "port": "COM6"}, daemon=True)
     expression_pipe_local, expression_pipe_remote = mp.Pipe()
     laughter_pipe_local, laughter_pipe_remote = mp.Pipe()
-    local_pipes = [expression_pipe_local, laughter_pipe_local]
-    queues = [arduino_queue]
+    local_pipes = {
+        "ExpressionPipe": expression_pipe_local,
+        "LaughterPipe": laughter_pipe_local}
+    queues: Queues = {"ArduinoQueue": arduino_queue}
     expression_proc = mp.Process(
         name="ExpressionProcess",
         target=expression_loop,
@@ -53,12 +68,11 @@ def game_loop() -> None:
     laughter_proc.join(0)
     kb_thread.start()
     arduino_thread.start()
-    print("Hello from main game loop!")
     while True:
         try:
-            handle_ipc_recv()
+            handle_ipc_recv(local_pipes)
             handle_itc_recv(queues)
-            handle_keyboard_input()
+            handle_keyboard_input(input_queue)
 
         except CameraError:
             logger.info("Shutting down due to camera error.")
@@ -76,13 +90,13 @@ def game_loop() -> None:
         if not (expression_proc.is_alive() or laughter_proc.is_alive()):
             break
 
-    shutdown(queues)
+    shutdown(local_pipes, queues)
 
 
-def handle_ipc_recv() -> None:
+def handle_ipc_recv(pipes: Pipes) -> None:
     """Handle inter-process communication in the receive direction."""
     global set_arduino_channel
-    ready = mp.connection.wait(local_pipes, 0)
+    ready = mp.connection.wait(pipes.values(), 0)
     for pipe in ready:
         if not isinstance(pipe, (Connection, PipeConnection)):
             continue
@@ -102,11 +116,9 @@ def handle_ipc_recv() -> None:
             set_arduino_channel(channel=1, state=False)
 
 
-
-def handle_itc_recv(
-        queues: Iterable[SimpleQueue[Union[StatusEnum, CommandEnum]]]) -> None:
+def handle_itc_recv(queues: Queues) -> None:
     """Handle inter-thread communication in the receive direction."""
-    for queue in queues:
+    for name, queue in queues.items():
         try:
             payload = queue.get(block=False)
             if payload is StatusEnum.SERIAL_ERROR:
@@ -118,7 +130,7 @@ def handle_itc_recv(
             continue
 
 
-def handle_keyboard_input() -> None:
+def handle_keyboard_input(input_queue: SimpleQueue[str]) -> None:
     """Handle user keyboard input."""
     if not input_queue.empty():
         payload = input_queue.get()
@@ -127,27 +139,28 @@ def handle_keyboard_input() -> None:
             raise UserTerminationException
 
 
-def shutdown(queues: Iterable[SimpleQueue[Union[StatusEnum, CommandEnum]]]) -> None:
+def shutdown(pipes: Pipes, queues: Queues) -> None:
     """Shutdown the game."""
-    global local_pipes
-    for pipe in local_pipes:
+    for name, pipe in pipes.items():
         try:
             pipe.send(CommandEnum.TERMINATE)
         except (OSError, BrokenPipeError):
             continue
-    for queue in queues:
+    for name, queue in queues.items():
         queue.put(CommandEnum.TERMINATE)
 
 
-def keyboard_loop() -> None:
+def keyboard_loop(queue: SimpleQueue[str]) -> None:
     """Keyboard input listener loop."""
-    global input_queue
     while True:
         received = input("> ").strip().casefold()
-        input_queue.put(received)
+        queue.put(received)
 
 
-def switch_channel(queue: SimpleQueue[Union[StatusEnum, CommandEnum]], channel: int, state: bool) -> None:
+def switch_channel(queue: SimpleQueue[Union[StatusEnum, CommandEnum]],
+                   channel: int,
+                   state: bool) -> None:
+    """Set the arduino channel."""
     if channel == 1 and state is True:
         queue.put(CommandEnum.CHANNEL_1_ON, block=False)
     elif channel == 1 and state is False:
@@ -157,4 +170,5 @@ def switch_channel(queue: SimpleQueue[Union[StatusEnum, CommandEnum]], channel: 
     elif channel == 2 and state is False:
         queue.put(CommandEnum.CHANNEL_2_OFF, block=False)
     else:
-        raise ValueError(f'Unknown combination of channel and state: {channel}, {state}.')
+        raise ValueError(
+            f'Unknown combination of channel and state: {channel}, {state}.')
