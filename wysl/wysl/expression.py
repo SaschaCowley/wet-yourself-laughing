@@ -8,8 +8,8 @@ from fer import FER
 
 from .enums import CommandEnum, StatusEnum
 from .exceptions import CameraError
-from .types import FEREmotions
-
+from .types import FEREmotions, FERDict
+from numpy import ndarray
 logger = mp.get_logger()
 cap: cv2.VideoCapture
 detector: FER
@@ -62,14 +62,8 @@ def get_emotions() -> StatusEnum:
     frame = cv2.flip(frame, 1)
     emotions = detector.detect_emotions(frame)
     if len(emotions) > 0:
-        emotions = emotions[0]
-        tl = emotions['box'][0:2]
-        sz = emotions['box'][2:4]
-        br = [tl[0]+sz[0], tl[1]+sz[1]]
-        cv2.rectangle(frame, tl, br, (0, 155, 255), 5)
-        ret = classify_expression(emotions['emotions'])
-
-    cv2.imshow('Camera feed', frame)
+        ret = classify_expression(emotions[0]['emotions'])
+    do_show(frame, emotions)
     return ret
 
 
@@ -91,3 +85,14 @@ def classify_expression(emotions: FEREmotions,
         return StatusEnum.MEDIUM_INTENSITY_SMILE_DETECTED
     else:
         return StatusEnum.HIGH_INTENSITY_SMILE_DETECTED
+
+
+def do_show(frame: ndarray, emotions_list: list[FERDict]) -> None:
+    """Visually display camera feed."""
+    if len(emotions_list) > 0:
+        emotions = emotions_list[0]
+        tl = emotions['box'][0:2]
+        sz = emotions['box'][2:4]
+        br = [tl[0]+sz[0], tl[1]+sz[1]]
+        cv2.rectangle(frame, tl, br, (0, 155, 255), 5)
+    cv2.imshow('Camera feed', frame)
