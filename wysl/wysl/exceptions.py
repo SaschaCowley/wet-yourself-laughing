@@ -7,3 +7,11 @@ class UserTerminationException(Exception):
 
 class CameraError(Exception):
     """Exception to be raised when there is a problem with the camera feed."""
+
+
+class MicrophoneError(Exception):
+    """Exception to be raised when there is a problem with the camera feed."""
+
+
+class SerialError(Exception):
+    """Exception to be raised when there is a problem with the camera feed."""
