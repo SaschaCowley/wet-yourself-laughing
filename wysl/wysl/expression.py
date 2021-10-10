@@ -11,7 +11,6 @@ from .exceptions import CameraError
 from .types import FEREmotions, FERDict
 from numpy import ndarray
 logger = mp.get_logger()
-cap: cv2.VideoCapture
 detector: FER
 
 
@@ -19,7 +18,6 @@ def expression_loop(pipe: Connection,
                     camera_index: int = 0,
                     mtcnn: bool = False) -> None:
     """Expression detection loop."""
-    global cap, detector
     logger.debug(f'Camera index: {camera_index}; mtcnn: {mtcnn}')
     detector = FER(mtcnn=mtcnn, compile=True)
     cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
@@ -35,7 +33,7 @@ def expression_loop(pipe: Connection,
                 break
 
         try:
-            emotions = get_emotions()
+            emotions = get_emotions(cap, detector)
             pipe.send(emotions)
         except CameraError as e:
             logger.error(e.args)
@@ -52,9 +50,8 @@ def expression_loop(pipe: Connection,
     pipe.close()
 
 
-def get_emotions() -> StatusEnum:
+def get_emotions(cap: cv2.VideoCapture, detector: FER) -> StatusEnum:
     """Capture a frame of video and extract emotions."""
-    global cap, detector
     stat, frame = cap.read()
     if not stat:
         raise CameraError("Failed to read from camera.")
