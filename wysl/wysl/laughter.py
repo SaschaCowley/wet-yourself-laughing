@@ -5,27 +5,15 @@ from collections import deque
 from multiprocessing.connection import Connection
 
 import matplotlib.pyplot as plt
-from matplotlib.backend_bases import CloseEvent
 import numpy as np
 import pyaudio
-from matplotlib.axes import Axes
+from matplotlib.backend_bases import CloseEvent
 from matplotlib.figure import Figure
-from matplotlib.lines import Line2D
-from matplotlib.patches import Polygon
 
 from .enums import CommandEnum, StatusEnum
 
-audio: pyaudio.PyAudio
-stream: pyaudio.Stream
-fig: Figure
-ax: Axes
-chunk_size: int
-waveform: Line2D
-sample_width: int
-rms_rect: Polygon
-recent_hits: deque[int]
-num_hits: int
-hit_volume: float
+
+recent_volumes: deque[float]
 running: bool
 
 
@@ -40,13 +28,10 @@ def laughter_loop(pipe: Connection,
                   records: int = 10,
                   hits: int = 5) -> None:
     """Laughter detection loop."""
-    global audio, stream, chunk_size, fig, ax, waveform, sample_width,\
-        rms_rect, recent_hits, num_hits, hit_volume, running
+    global recent_volumes, running
     chunk_size = int(rate/(1/chunk_duration))
-    sample_width = width
-    num_hits = hits
     hit_volume = mean+3*stddev
-    recent_hits = deque(maxlen=records)
+    recent_volumes = deque(maxlen=records)
     audio = pyaudio.PyAudio()
     stream = audio.open(rate=rate,
                         channels=channels,
@@ -56,10 +41,10 @@ def laughter_loop(pipe: Connection,
                         frames_per_buffer=chunk_size, start=False)
     plt.ioff()
     fig, ax = plt.subplots()
-    ax.axhspan(-10000, 10000, fill=False, linestyle='dotted')
-    rms_rect = ax.axhspan(0, 0, fill=False)
-    waveform, = ax.plot(np.arange(chunk_size), np.zeros(chunk_size))
-    print(type(waveform))
+    ax.axhspan(
+        -hit_volume, hit_volume, fill=False, linestyle='dotted',
+        label="Threshhold")
+    ax.plot(np.arange(chunk_size), np.zeros(chunk_size), label="Waveform")
     ax.set_xlim(0, chunk_size-1)
     ax.set_ylim(-(2**(8*width))/2, (2**(8*width))/2)
     ax.set_title("Raw Audio Signal")
@@ -74,7 +59,9 @@ def laughter_loop(pipe: Connection,
             if payload == CommandEnum.TERMINATE:
                 break
 
-        stat = detect_laughter()
+        stat = detect_laughter(
+            stream=stream, chunk_size=chunk_size, sample_width=width,
+            figure=fig, hit_volume=hit_volume, num_hits=hits)
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
         if stat:
@@ -89,23 +76,49 @@ def laughter_loop(pipe: Connection,
     audio.terminate()
 
 
-def detect_laughter() -> bool:
+def detect_laughter(stream: pyaudio.Stream,
+                    chunk_size: int,
+                    sample_width: int,
+                    figure: Figure,
+                    hit_volume: float,
+                    num_hits: int) -> StatusEnum:
     """Detect laughter, draw graph, and return."""
-    global stream, ax, chunk_size, waveform, sample_width, rms_rect,\
-        recent_hits, num_hits, hit_volume
+    global recent_volumes
     in_data = stream.read(chunk_size)
-    amplitude = np.fromstring(in_data, np.int16)
     volume = audioop.rms(in_data, sample_width)
-    recent_hits.append(volume >= hit_volume)
-    waveform.set_ydata(amplitude)
-    rms_rect.remove()
-    rms_rect = ax.axhspan(-volume, volume, fill=False)
+    recent_volumes.append(volume)
     stream.write(in_data)
-    return (len(recent_hits) == recent_hits.maxlen) \
-        and (recent_hits.count(True) == num_hits)
+    do_show(in_data, volume, figure)
+    return classify_sound(recent_volumes, hit_volume, num_hits)
+
+
+def classify_sound(volumes: deque[float],
+                   hit_volume: float,
+                   min_hits: int) -> StatusEnum:
+    """Classify recent volume samples."""
+    if volumes.maxlen is not None and len(volumes) < volumes.maxlen:
+        return StatusEnum.NO_LAUGHTER_DETECTED
+    hits = [volume >= hit_volume for volume in volumes].count(True)
+    if hits >= min_hits:
+        return StatusEnum.LAUGHTER_DETECTED
+    else:
+        return StatusEnum.NO_LAUGHTER_DETECTED
+
+
+def do_show(frame: bytes, rms: float, figure: Figure) -> None:
+    """Visually display microphone feed."""
+    ax = figure.gca()
+    amplitudes = np.fromstring(frame, np.int16)
+    for child in ax.get_children():
+        label = child.get_label()
+        if label == "Volume":
+            child.remove()
+        elif label == "Waveform":
+            child.set_ydata(amplitudes)
+    ax.axhspan(-rms, rms, fill=False, label="Volume")
 
 
 def figure_close(event: CloseEvent) -> None:
-    """Callback function for when the waveform figure is closed."""
+    """Detect when the waveform window has been closed."""
     global running
     running = False
