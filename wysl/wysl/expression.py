@@ -8,7 +8,7 @@ from fer import FER
 
 from .enums import CommandEnum, StatusEnum
 from .exceptions import CameraError
-from .utils import ExpressionPayload, NullableExpressionPayload
+from .types import FEREmotions
 
 logger = mp.get_logger()
 cap: cv2.VideoCapture
@@ -36,10 +36,11 @@ def expression_loop(pipe: Connection,
 
         try:
             emotions = get_emotions()
-            if emotions is not None:
-                pipe.send(emotions)
+            pipe.send(emotions)
         except CameraError as e:
             logger.error(e.args)
+            pipe.send(StatusEnum.CAMERA_ERROR)
+            break
 
         if cv2.waitKey(1) == ord('q'):
             logger.info("Camera stream terminated by user.")
@@ -51,13 +52,13 @@ def expression_loop(pipe: Connection,
     pipe.close()
 
 
-def get_emotions() -> NullableExpressionPayload:
+def get_emotions() -> StatusEnum:
     """Capture a frame of video and extract emotions."""
     global cap, detector
     stat, frame = cap.read()
     if not stat:
         raise CameraError("Failed to read from camera.")
-    ret = None
+    ret = StatusEnum.NO_SMILE_DETECTED
     frame = cv2.flip(frame, 1)
     emotions = detector.detect_emotions(frame)
     if len(emotions) > 0:
@@ -66,6 +67,27 @@ def get_emotions() -> NullableExpressionPayload:
         sz = emotions['box'][2:4]
         br = [tl[0]+sz[0], tl[1]+sz[1]]
         cv2.rectangle(frame, tl, br, (0, 155, 255), 5)
-        ret = ExpressionPayload.from_fer_dict(emotions)
+        ret = classify_expression(emotions['emotions'])
+
     cv2.imshow('Camera feed', frame)
     return ret
+
+
+def classify_expression(emotions: FEREmotions,
+                        happy_weight: float = 1,
+                        surprise_weight: float = 1,
+                        low_threshhold: float = 0.4,
+                        medium_threshhold: float = 0.6,
+                        high_threshhold: float = 0.8) -> StatusEnum:
+    """Classify emotions into no, low, medium, or high intensity smiles."""
+    weighted_average = ((emotions['happy']*happy_weight
+                         + emotions['surprise'] * surprise_weight)
+                        / (happy_weight + surprise_weight))
+    if weighted_average < low_threshhold:
+        return StatusEnum.NO_SMILE_DETECTED
+    elif weighted_average < medium_threshhold:
+        return StatusEnum.LOW_INTENSITY_SMILE_DETECTED
+    elif weighted_average < high_threshhold:
+        return StatusEnum.MEDIUM_INTENSITY_SMILE_DETECTED
+    else:
+        return StatusEnum.HIGH_INTENSITY_SMILE_DETECTED
