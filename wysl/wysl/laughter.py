@@ -5,6 +5,7 @@ from collections import deque
 from multiprocessing.connection import Connection
 
 import matplotlib.pyplot as plt
+from matplotlib.backend_bases import CloseEvent
 import numpy as np
 import pyaudio
 from matplotlib.axes import Axes
@@ -79,9 +80,8 @@ def laughter_loop(pipe: Connection,
         if stat:
             pipe.send(StatusEnum.LAUGHTER_DETECTED)
 
-
     if not running:
-            pipe.send(CommandEnum.TERMINATE)
+        pipe.send(CommandEnum.TERMINATE)
 
     plt.close('all')
     stream.stop_stream()
@@ -105,6 +105,7 @@ def detect_laughter() -> bool:
         and (recent_hits.count(True) == num_hits)
 
 
-def figure_close(event):
+def figure_close(event: CloseEvent) -> None:
+    """Callback function for when the waveform figure is closed."""
     global running
     running = False
