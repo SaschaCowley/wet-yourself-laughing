@@ -11,6 +11,7 @@ def recv(sock, mask):
 
 sock = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 sock.bind(address)
+
 sock.setblocking(False)
 sel.register(sock, selectors.EVENT_READ, recv)
 
