@@ -1,6 +1,6 @@
 """Game main process code."""
 
-# import logging
+from configparser import ConfigParser
 import multiprocessing as mp
 import threading
 from multiprocessing.connection import Connection, PipeConnection
@@ -32,7 +32,7 @@ logger.setLevel(1)
 set_arduino_channel: PartialSetChannel
 
 
-def game_loop() -> None:
+def game_loop(config: ConfigParser) -> None:
     """Run the primary game loop."""
     global set_arduino_channel
     input_queue: SimpleQueue[str] = SimpleQueue()
@@ -40,34 +40,64 @@ def game_loop() -> None:
         target=keyboard_loop,
         name="KeyboardThread",
         daemon=True,
-        kwargs={"queue": input_queue})
+        kwargs={
+            "queue": input_queue
+        })
     arduino_queue: SimpleQueue[Union[StatusEnum, CommandEnum]] = SimpleQueue()
     set_arduino_channel = partial(switch_channel, queue=arduino_queue)
+    arduino_cfg = config["arduino"]
     arduino_thread = threading.Thread(
         target=arduino_loop,
         name="ArduinoThread",
-        kwargs={"queue": arduino_queue, "port": "COM6"}, daemon=True)
+        kwargs={
+            "queue": arduino_queue,
+            "port": arduino_cfg.get("port"),
+            "baudrate": arduino_cfg.getint("baudrate")
+        }, daemon=True)
     expression_pipe_local, expression_pipe_remote = mp.Pipe()
     laughter_pipe_local, laughter_pipe_remote = mp.Pipe()
-    local_pipes = {
-        "ExpressionPipe": expression_pipe_local,
-        "LaughterPipe": laughter_pipe_local}
+    local_pipes = {"ExpressionPipe": expression_pipe_local,
+                   "LaughterPipe": laughter_pipe_local}
     queues: Queues = {"ArduinoQueue": arduino_queue}
+    expression_cfg = config['expression']
     expression_proc = mp.Process(
         name="ExpressionProcess",
         target=expression_loop,
-        kwargs={"pipe": expression_pipe_remote, "camera_index": 1})
+        kwargs={
+            "pipe": expression_pipe_remote,
+            "mtcnn": expression_cfg.getboolean("mtcnn"),
+            "camera_index": expression_cfg.getint("camera_index"),
+            "happy_weight": expression_cfg.getfloat("happy_weight"),
+            "surprise_weight": expression_cfg.getfloat("surprise_weight"),
+            "low_threshhold": expression_cfg.getfloat("low_threshhold"),
+            "medium_threshhold": expression_cfg.getfloat("medium_threshhold"),
+            "high_threshhold": expression_cfg.getfloat("high_threshhold")
+        })
+    laughter_cfg = config["laughter"]
     laughter_proc = mp.Process(
         name="LaughterProcess",
         target=laughter_loop,
-        kwargs={"pipe": laughter_pipe_remote})
+        kwargs={
+            "pipe": laughter_pipe_remote,
+            "microphone_index": laughter_cfg.getint("microphone_index"),
+            "rate": laughter_cfg.getint("rate"),
+            "channels": laughter_cfg.getint("channels"),
+            "width": laughter_cfg.getint("width"),
+            "chunk_duration": laughter_cfg.getfloat("chunk_duration"),
+            "mean": laughter_cfg.getfloat("mean"),
+            "stddev": laughter_cfg.getfloat("stddev"),
+            "records": laughter_cfg.getint("records"),
+            "hits": laughter_cfg.getint("hits")
+        })
     # processes: list[mp.Process] = [expression_proc, laughter_proc]
     # expression_proc.start()
     # expression_proc.join(0)
     laughter_proc.start()
     laughter_proc.join(0)
     kb_thread.start()
+    kb_thread.join(0)
     arduino_thread.start()
+    arduino_thread.join(0)
     while True:
         try:
             handle_ipc_recv(local_pipes)

@@ -14,7 +14,6 @@ from matplotlib.figure import Figure
 from .enums import CommandEnum, StatusEnum
 
 logger = mp.get_logger()
-recent_volumes: deque[float]
 running: bool
 
 
@@ -29,11 +28,11 @@ def laughter_loop(pipe: Connection,
                   records: int = 10,
                   hits: int = 5) -> None:
     """Laughter detection loop."""
-    global recent_volumes, running
+    global running
     logger.debug(f"Starting: {locals()}")
     chunk_size = int(rate/(1/chunk_duration))
     hit_volume = mean+3*stddev
-    recent_volumes = deque(maxlen=records)
+    recent_volumes: deque[float] = deque(maxlen=records)
     audio = pyaudio.PyAudio()
     stream = audio.open(rate=rate,
                         channels=channels,
@@ -63,7 +62,8 @@ def laughter_loop(pipe: Connection,
 
         stat = detect_laughter(
             stream=stream, chunk_size=chunk_size, sample_width=width,
-            figure=fig, hit_volume=hit_volume, num_hits=hits)
+            figure=fig, hit_volume=hit_volume, num_hits=hits,
+            recent_volumes=recent_volumes)
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
         pipe.send(stat)
@@ -82,9 +82,8 @@ def detect_laughter(stream: pyaudio.Stream,
                     sample_width: int,
                     figure: Figure,
                     hit_volume: float,
-                    num_hits: int) -> StatusEnum:
+                    num_hits: int, recent_volumes: deque[float]) -> StatusEnum:
     """Detect laughter, draw graph, and return."""
-    global recent_volumes
     in_data = stream.read(chunk_size)
     volume = audioop.rms(in_data, sample_width)
     recent_volumes.append(volume)

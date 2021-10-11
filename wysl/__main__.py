@@ -4,8 +4,10 @@ import cmd
 import wysl
 import wysl.game
 from wysl.setup import setup
+from configparser import ConfigParser
 
-config = {"camera": 0, "microphone": 0}
+config = ConfigParser()
+config.read('config.ini')
 
 
 class WyslShell(cmd.Cmd):
@@ -26,4 +28,4 @@ class WyslShell(cmd.Cmd):
 if __name__ == '__main__':
     # WyslShell().cmdloop()
     # setup(config)
-    wysl.game.game_loop()
+    wysl.game.game_loop(config)
