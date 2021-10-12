@@ -3,7 +3,7 @@
 import socket
 import selectors
 from functools import partial
-from queue import SimpleQueue, Empty
+from queue import Queue, Empty
 from .types import Payload
 from .enums import CommandEnum, DirectionEnum, EventEnum, ErrorEnum
 import multiprocessing as mp
@@ -11,7 +11,7 @@ import multiprocessing as mp
 logger = mp.get_logger()
 
 
-def network_loop(queue: SimpleQueue[Payload],
+def network_loop(queue: Queue[Payload],
                  local_ip: str,
                  local_port: int,
                  remote_ip: str,
@@ -31,7 +31,7 @@ def network_loop(queue: SimpleQueue[Payload],
         recv = partial(handle_udp_recv, queue)
         sel.register(recv_sock, selectors.EVENT_READ, recv)
     except OSError:
-        queue.put(Payload(ErrorEnum.NETWORK_ERROR))
+        queue.put_nowait(Payload(ErrorEnum.NETWORK_ERROR))
         exit()
     send = partial(handle_udp_send,
                    sock=send_sock,
@@ -41,11 +41,11 @@ def network_loop(queue: SimpleQueue[Payload],
     while True:
         try:
             payload, direction = queue.get(block=False)
+            # print(f'Networking payload: {payload} {direction}')
             if direction == DirectionEnum.RECV:
-                queue.put(Payload(payload=payload, others=direction))
-                pass
+                queue.put_nowait(Payload(payload=payload, others=direction))
             if direction == DirectionEnum.SEND:
-                send(payload)
+                send(payload.value)
             if payload == CommandEnum.TERMINATE:
                 break
         except Empty:
@@ -53,7 +53,7 @@ def network_loop(queue: SimpleQueue[Payload],
 
         events = sel.select(0)
         for key, mask in events:
-            print("Got something...")
+            # print("Got something...")
             callback = key.data
             callback(key.fileobj, mask)
 
@@ -62,7 +62,7 @@ def network_loop(queue: SimpleQueue[Payload],
     sel.close()
 
 
-def handle_udp_recv(queue: SimpleQueue[Payload],
+def handle_udp_recv(queue: Queue[Payload],
                     sock: socket.socket,
                     mask: int) -> None:
     """Handle receiving a datagram."""
@@ -70,7 +70,7 @@ def handle_udp_recv(queue: SimpleQueue[Payload],
     logger.debug("Received %s from %s:%d", data, *addr)
     try:
         payload = EventEnum(data)
-        queue.put(Payload(payload, DirectionEnum.RECV))
+        queue.put_nowait(Payload(payload, DirectionEnum.RECV))
     except ValueError:
         logger.exception("Dropping packet '%s'.", data)
         pass
@@ -85,4 +85,6 @@ def handle_udp_send(data: bytes,
     This is mainly here so we can make a partial of it.
     """
     print(f'Sending {data!r} to {ip}:{port}')
-    return sock.sendto(data, (ip, port))
+    no = sock.sendto(data, (ip, port))
+    print(no)
+    return no

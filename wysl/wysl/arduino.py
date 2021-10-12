@@ -4,12 +4,12 @@ import multiprocessing as mp
 from .enums import CommandEnum, ErrorEnum
 from .types import Payload
 
-from queue import SimpleQueue, Empty
+from queue import Queue, Empty
 
 logger = mp.get_logger()
 
 
-def arduino_loop(queue: SimpleQueue[Payload],
+def arduino_loop(queue: Queue[Payload],
                  port: str,
                  baudrate: int = 9600) -> None:
     """Arduino communication loop."""

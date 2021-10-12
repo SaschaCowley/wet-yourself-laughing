@@ -24,7 +24,7 @@ def expression_loop(pipe: Connection,
                     high_threshhold: float) -> None:
     """Expression detection loop."""
     logger.info("Starting: %s", locals())
-    exit()
+
     classifier = partial(classify_expression,
                          happy_weight=happy_weight,
                          surprise_weight=surprise_weight,
