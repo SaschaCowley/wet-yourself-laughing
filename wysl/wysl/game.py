@@ -16,6 +16,7 @@ from .expression import expression_loop
 from .laughter import laughter_loop
 from .network import network_loop
 from .types import Payload
+from .keyboard import keyboard_loop
 
 Queues = Mapping[str, SimpleQueue[Payload]]
 Pipes = Mapping[str, Connection]
@@ -48,12 +49,13 @@ def game_loop(config: ConfigParser) -> None:
 
     # IPC and ITC communication constructs
     # Create ITC queues
-    input_queue: SimpleQueue[str] = SimpleQueue()
+    input_queue: SimpleQueue[Payload] = SimpleQueue()
     arduino_queue: SimpleQueue[Payload] = SimpleQueue()
     network_queue: SimpleQueue[Payload] = SimpleQueue()
     queues: Queues = {
         "ArduinoQueue": arduino_queue,
         "NetworkQueue": network_queue,
+        "KeyboardQueue": input_queue,
     }
 
     # Create IPC pipes
@@ -144,7 +146,7 @@ def game_loop(config: ConfigParser) -> None:
         try:
             handle_ipc_recv(local_pipes)
             handle_itc_recv(queues)
-            handle_keyboard_input(input_queue)
+            # handle_keyboard_input(input_queue)
 
         except CameraError:
             logger.info("Shutting down due to camera error.")
@@ -202,6 +204,8 @@ def handle_itc_recv(queues: Queues) -> None:
             elif payload is ErrorEnum.NETWORK_ERROR:
                 logger.error("Problem with the network socket device.")
                 raise NetworkError
+            elif payload is CommandEnum.TERMINATE:
+                raise UserTerminationException
             else:
                 queue.put(Payload(payload, other))
         except Empty:
@@ -230,13 +234,6 @@ def shutdown(pipes: Pipes, queues: Queues) -> None:
             continue
     for name, queue in queues.items():
         queue.put(Payload(CommandEnum.TERMINATE))
-
-
-def keyboard_loop(queue: SimpleQueue[str]) -> None:
-    """Keyboard input listener loop."""
-    while True:
-        received = input("> ").strip().casefold()
-        queue.put(received)
 
 
 def switch_channel(queue: SimpleQueue[Payload],
