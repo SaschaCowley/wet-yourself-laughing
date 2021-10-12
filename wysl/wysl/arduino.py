@@ -40,8 +40,6 @@ def arduino_loop(queue: SimpleQueue[Payload],
                 msg += payload.value + other[0].value + str(other[1])
             else:
                 pass
-            print(payload, other)
-            print(msg)
             ser.write(bytes(msg, encoding='ascii'))
         except Empty:
             continue
