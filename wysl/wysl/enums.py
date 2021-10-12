@@ -47,3 +47,10 @@ class DirectionEnum(Enum):
 
     SEND = auto()
     RECV = auto()
+
+
+class LocationEnum(Enum):
+    """Enumeration of locations."""
+
+    LOCAL = auto()
+    REMOTE = auto()

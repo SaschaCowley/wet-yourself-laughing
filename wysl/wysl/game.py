@@ -1,15 +1,14 @@
 """Game main process code."""
 
-
 from configparser import ConfigParser
 import multiprocessing as mp
 import threading
 from multiprocessing.connection import Connection, PipeConnection
 from queue import Empty, SimpleQueue
-from typing import Mapping, Protocol
+from typing import Mapping, Protocol, Callable
 from functools import partial
 from .arduino import arduino_loop
-from .enums import CommandEnum, EventEnum, ErrorEnum, ChannelEnum
+from .enums import CommandEnum, EventEnum, ErrorEnum, ChannelEnum, LocationEnum, DirectionEnum
 from .exceptions import (CameraError, MicrophoneError, SerialError,
                          NetworkError, UserTerminationException)
 from .expression import expression_loop
@@ -46,6 +45,7 @@ def game_loop(config: ConfigParser) -> None:
     expression_cfg = config['expression']
     laughter_cfg = config["laughter"]
     network_cfg = config['network']
+    game_cfg = config['game']
 
     # IPC and ITC communication constructs
     # Create ITC queues
@@ -128,6 +128,15 @@ def game_loop(config: ConfigParser) -> None:
 
     # Partials for convenience
     set_arduino_channel = partial(switch_channel, arduino_queue)
+    event_handler = partial(handle_event,
+                            arduino_queue=arduino_queue,
+                            network_queue=network_queue,
+                            slower_tickle=game_cfg.getint("slower_tickle"),
+                            slow_tickle=game_cfg.getint("slow_tickle"),
+                            fast_tickle=game_cfg.getint("fast_tickle"),
+                            faster_tickle=game_cfg.getint("faster_tickle"),
+                            feather_channel=game_cfg.getint("feather_channel"),
+                            balloon_channel=game_cfg.getint("balloon_channel"))
 
     # Start and join all threads and processes
     # expression_proc.start()
@@ -144,8 +153,8 @@ def game_loop(config: ConfigParser) -> None:
     # Main event loop
     while True:
         try:
-            handle_ipc_recv(local_pipes)
-            handle_itc_recv(queues)
+            handle_ipc_recv(local_pipes, event_handler)
+            handle_itc_recv(queues, event_handler)
             # handle_keyboard_input(input_queue)
 
         except CameraError:
@@ -170,7 +179,8 @@ def game_loop(config: ConfigParser) -> None:
     shutdown(local_pipes, queues)
 
 
-def handle_ipc_recv(pipes: Pipes) -> None:
+def handle_ipc_recv(pipes: Pipes,
+                    event_handler: Callable[[EventEnum, LocationEnum], None]) -> None:
     """Handle inter-process communication in the receive direction."""
     global set_arduino_channel
     ready = mp.connection.wait(pipes.values(), 0)
@@ -187,13 +197,12 @@ def handle_ipc_recv(pipes: Pipes) -> None:
             raise MicrophoneError
         elif payload is CommandEnum.TERMINATE:
             raise UserTerminationException
-        elif payload is EventEnum.LAUGHTER_DETECTED:
-            set_arduino_channel(channel=1, state=CommandEnum.CHANNEL_ON)
-        elif payload is EventEnum.NO_LAUGHTER_DETECTED:
-            set_arduino_channel(channel=1, state=CommandEnum.CHANNEL_OFF)
+        elif isinstance(payload, EventEnum):
+            event_handler(event=payload, location=LocationEnum.LOCAL)
 
 
-def handle_itc_recv(queues: Queues) -> None:
+def handle_itc_recv(queues: Queues,
+                    event_handler: Callable[[EventEnum, LocationEnum], None]) -> None:
     """Handle inter-thread communication in the receive direction."""
     for name, queue in queues.items():
         try:
@@ -206,19 +215,50 @@ def handle_itc_recv(queues: Queues) -> None:
                 raise NetworkError
             elif payload is CommandEnum.TERMINATE:
                 raise UserTerminationException
+            elif isinstance(payload, EventEnum):
+                event_handler(event=payload, location=LocationEnum.REMOTE if name == "NetworkQueue" else LocationEnum.LOCAL)
             else:
                 queue.put(Payload(payload, other))
         except Empty:
             continue
 
 
-def handle_keyboard_input(input_queue: SimpleQueue[str]) -> None:
-    """Handle user keyboard input."""
-    if not input_queue.empty():
-        payload = input_queue.get()
-        logger.info(f'Received input: {payload}')
-        if payload == 'quit':
-            raise UserTerminationException
+def handle_event(arduino_queue: SimpleQueue[Payload],
+                 network_queue: SimpleQueue[Payload],
+                 slower_tickle: int,
+                 slow_tickle: int,
+                 fast_tickle: int,
+                 faster_tickle: int,
+                 feather_channel: int,
+                 balloon_channel: int,
+                 event: EventEnum,
+                 location: LocationEnum) -> None:
+    """Handle events."""
+    global set_arduino_channel
+    print(f'Balloon={balloon_channel}, feather={feather_channel}')
+    print("Handling event:", event, location)
+    if event is EventEnum.LAUGHTER_DETECTED:
+        print("Setting on")
+        set_arduino_channel(channel=balloon_channel, state=CommandEnum.CHANNEL_ON)
+    elif event is EventEnum.NO_LAUGHTER_DETECTED:
+        set_arduino_channel(channel=balloon_channel, state=CommandEnum.CHANNEL_OFF)
+    elif event in (EventEnum.NO_SMILE_DETECTED,
+                   EventEnum.LOW_INTENSITY_SMILE_DETECTED,
+                   EventEnum.MEDIUM_INTENSITY_SMILE_DETECTED,
+                   EventEnum.HIGH_INTENSITY_SMILE_DETECTED):
+        if location is LocationEnum.LOCAL:
+            network_queue.put(Payload(event, DirectionEnum.SEND))
+        elif location is LocationEnum.REMOTE:
+            speed = 0
+            if event is EventEnum.NO_SMILE_DETECTED:
+                speed = slower_tickle
+            elif event is EventEnum.LOW_INTENSITY_SMILE_DETECTED:
+                speed = slow_tickle
+            elif event is EventEnum.MEDIUM_INTENSITY_SMILE_DETECTED:
+                speed = fast_tickle
+            elif event is EventEnum.HIGH_INTENSITY_SMILE_DETECTED:
+                speed = faster_tickle
+            set_arduino_channel(channel=feather_channel, state=CommandEnum.PULSE_CHANNEL, interval=speed)
 
 
 def shutdown(pipes: Pipes, queues: Queues) -> None:
@@ -241,6 +281,7 @@ def switch_channel(queue: SimpleQueue[Payload],
                    state: CommandEnum,
                    interval: int = 0) -> None:
     """Set the arduino channel."""
+    print(f'Controling arduino: {channel!r} {state!r} {interval!r}')
     if channel == 1:
         ch = ChannelEnum.CHANNEL_1
     elif channel == 2:
@@ -252,8 +293,10 @@ def switch_channel(queue: SimpleQueue[Payload],
     else:
         return
     if state == CommandEnum.CHANNEL_ON or state == CommandEnum.CHANNEL_OFF:
+        print(f'Executing command: {state} {ch}')
         queue.put(Payload(state, ch))
     elif state == CommandEnum.PULSE_CHANNEL:
+        print(f'Executing: {state} {ch} {interval}')
         queue.put(Payload(state, (ch, interval)))
     else:
         return
