@@ -1,5 +1,4 @@
 """Arduino communication game component."""
-
 import serial
 import multiprocessing as mp
 from .enums import CommandEnum, ErrorEnum
@@ -15,9 +14,14 @@ def arduino_loop(queue: SimpleQueue[Payload],
                  baudrate: int = 9600) -> None:
     """Arduino communication loop."""
     logger.info("Port: %s, baudrate: %d", port, baudrate)
-    channels = [False, False]
     try:
-        ser = serial.Serial(port=port, baudrate=baudrate, timeout=0)
+        # dsrdtr=True seems to fix the problem where reads within 1-2 seconds
+        # of opening the port fail silently. See
+        # https://github.com/pyserial/pyserial/issues/329#issuecomment-791997557
+        ser = serial.Serial(port=port,
+                            baudrate=baudrate,
+                            timeout=0,
+                            dsrdtr=True)
     except (ValueError, serial.SerialException) as e:
         logger.error(e)
         queue.put(Payload(ErrorEnum.SERIAL_ERROR))
@@ -26,24 +30,20 @@ def arduino_loop(queue: SimpleQueue[Payload],
     while True:
         try:
             payload, other = queue.get(block=False)
+            msg = ''
             if payload == CommandEnum.TERMINATE:
                 break
-            elif payload == CommandEnum.CHANNEL_1_ON and channels[0] is False:
-                ser.write(b'A')
-                channels[0] = True
-            elif payload == CommandEnum.CHANNEL_1_OFF and channels[0] is True:
-                ser.write(b'a')
-                channels[0] = False
-            elif payload == CommandEnum.CHANNEL_2_ON and channels[1] is False:
-                ser.write(b'B')
-                channels[1] = True
-            elif payload == CommandEnum.CHANNEL_2_OFF and channels[1] is True:
-                ser.write(b'b')
-                channels[1] = False
+            elif (payload == CommandEnum.CHANNEL_ON
+                    or payload == CommandEnum.CHANNEL_OFF):
+                msg += payload.value + other.value
+            elif payload == CommandEnum.PULSE_CHANNEL:
+                msg += payload.value + other[0].value + str(other[1])
             else:
-                queue.put(Payload(payload, other))
+                pass
+            print(payload, other)
+            print(msg)
+            ser.write(bytes(msg, encoding='ascii'))
         except Empty:
             continue
 
-    ser.write(b'abcd')
     ser.close()

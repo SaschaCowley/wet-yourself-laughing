@@ -27,10 +27,19 @@ class CommandEnum(Enum):
     """Enumeration of statuses."""
 
     TERMINATE = auto()
-    CHANNEL_1_ON = auto()
-    CHANNEL_1_OFF = auto()
-    CHANNEL_2_ON = auto()
-    CHANNEL_2_OFF = auto()
+    CHANNEL_ON = '+'
+    CHANNEL_OFF = '-'
+    PULSE_CHANNEL = '!'
+    QUERY_CHANNEL = '?'
+
+
+class ChannelEnum(Enum):
+    """Enumeration of relay channels."""
+
+    CHANNEL_1 = 'A'
+    CHANNEL_2 = 'B'
+    CHANNEL_3 = 'C'
+    CHANNEL_4 = 'D'
 
 
 class DirectionEnum(Enum):

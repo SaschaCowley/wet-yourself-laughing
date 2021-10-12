@@ -9,7 +9,7 @@ from queue import Empty, SimpleQueue
 from typing import Mapping, Protocol
 from functools import partial
 from .arduino import arduino_loop
-from .enums import CommandEnum, EventEnum, ErrorEnum
+from .enums import CommandEnum, EventEnum, ErrorEnum, ChannelEnum
 from .exceptions import (CameraError, MicrophoneError, SerialError,
                          NetworkError, UserTerminationException)
 from .expression import expression_loop
@@ -24,7 +24,9 @@ Pipes = Mapping[str, Connection]
 class PartialSetChannel(Protocol):
     """Type hint for set_arduino_channel."""
 
-    def __call__(_, channel: int, state: bool) -> None:
+    def __call__(_, channel: int,
+                 state: CommandEnum,
+                 interval: int = 0) -> None:
         """Call, dummy."""
         ...
 
@@ -123,7 +125,7 @@ def game_loop(config: ConfigParser) -> None:
         })
 
     # Partials for convenience
-    set_arduino_channel = partial(switch_channel, queue=arduino_queue)
+    set_arduino_channel = partial(switch_channel, arduino_queue)
 
     # Start and join all threads and processes
     # expression_proc.start()
@@ -136,6 +138,10 @@ def game_loop(config: ConfigParser) -> None:
     arduino_thread.join(0)
     network_thread.start()
     network_thread.join(0)
+    # time.sleep(1)
+    set_arduino_channel(1, CommandEnum.CHANNEL_ON)
+    set_arduino_channel(2, CommandEnum.CHANNEL_OFF)
+    set_arduino_channel(3, CommandEnum.PULSE_CHANNEL, 100)
 
     # Main event loop
     while True:
@@ -184,9 +190,9 @@ def handle_ipc_recv(pipes: Pipes) -> None:
         elif payload is CommandEnum.TERMINATE:
             raise UserTerminationException
         elif payload is EventEnum.LAUGHTER_DETECTED:
-            set_arduino_channel(channel=1, state=True)
+            set_arduino_channel(channel=1, state=CommandEnum.CHANNEL_ON)
         elif payload is EventEnum.NO_LAUGHTER_DETECTED:
-            set_arduino_channel(channel=1, state=False)
+            set_arduino_channel(channel=1, state=CommandEnum.CHANNEL_OFF)
 
 
 def handle_itc_recv(queues: Queues) -> None:
@@ -217,6 +223,10 @@ def handle_keyboard_input(input_queue: SimpleQueue[str]) -> None:
 
 def shutdown(pipes: Pipes, queues: Queues) -> None:
     """Shutdown the game."""
+    global set_arduino_channel
+    for i in range(1, 5):
+        set_arduino_channel(i, CommandEnum.PULSE_CHANNEL, 0)
+        set_arduino_channel(i, CommandEnum.CHANNEL_OFF)
     for name, pipe in pipes.items():
         try:
             pipe.send(CommandEnum.TERMINATE)
@@ -235,16 +245,22 @@ def keyboard_loop(queue: SimpleQueue[str]) -> None:
 
 def switch_channel(queue: SimpleQueue[Payload],
                    channel: int,
-                   state: bool) -> None:
+                   state: CommandEnum,
+                   interval: int = 0) -> None:
     """Set the arduino channel."""
-    if channel == 1 and state is True:
-        queue.put(Payload(CommandEnum.CHANNEL_1_ON), block=False)
-    elif channel == 1 and state is False:
-        queue.put(Payload(CommandEnum.CHANNEL_1_OFF), block=False)
-    elif channel == 2 and state is True:
-        queue.put(Payload(CommandEnum.CHANNEL_2_ON), block=False)
-    elif channel == 2 and state is False:
-        queue.put(Payload(CommandEnum.CHANNEL_2_OFF), block=False)
+    if channel == 1:
+        ch = ChannelEnum.CHANNEL_1
+    elif channel == 2:
+        ch = ChannelEnum.CHANNEL_2
+    elif channel == 3:
+        ch = ChannelEnum.CHANNEL_3
+    elif channel == 4:
+        ch = ChannelEnum.CHANNEL_4
     else:
-        raise ValueError(
-            f'Unknown combination of channel and state: {channel}, {state}.')
+        return
+    if state == CommandEnum.CHANNEL_ON or state == CommandEnum.CHANNEL_OFF:
+        queue.put(Payload(state, ch))
+    elif state == CommandEnum.PULSE_CHANNEL:
+        queue.put(Payload(state, (ch, interval)))
+    else:
+        return
