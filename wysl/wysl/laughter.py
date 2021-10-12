@@ -1,8 +1,8 @@
 """Laughter detection component of the game."""
 
 import audioop
-from collections import deque
 import multiprocessing as mp
+from collections import deque
 from multiprocessing.connection import Connection
 
 import matplotlib.pyplot as plt
@@ -12,6 +12,7 @@ from matplotlib.backend_bases import CloseEvent
 from matplotlib.figure import Figure
 
 from .enums import CommandEnum, EventEnum
+from .types import FloatDeque
 
 logger = mp.get_logger()
 running: bool
@@ -32,7 +33,7 @@ def laughter_loop(pipe: Connection,
     logger.debug(f"Starting: {locals()}")
     chunk_size = int(rate/(1/chunk_duration))
     hit_volume = mean+3*stddev
-    recent_volumes: deque[float] = deque(maxlen=records)
+    recent_volumes: FloatDeque = deque(maxlen=records)
     audio = pyaudio.PyAudio()
     stream = audio.open(rate=rate,
                         channels=channels,
@@ -82,7 +83,7 @@ def detect_laughter(stream: pyaudio.Stream,
                     sample_width: int,
                     figure: Figure,
                     hit_volume: float,
-                    num_hits: int, recent_volumes: deque[float]) -> EventEnum:
+                    num_hits: int, recent_volumes: FloatDeque) -> EventEnum:
     """Detect laughter, draw graph, and return."""
     in_data = stream.read(chunk_size)
     volume = audioop.rms(in_data, sample_width)
@@ -92,7 +93,7 @@ def detect_laughter(stream: pyaudio.Stream,
     return classify_sound(recent_volumes, hit_volume, num_hits)
 
 
-def classify_sound(volumes: deque[float],
+def classify_sound(volumes: FloatDeque,
                    hit_volume: float,
                    min_hits: int) -> EventEnum:
     """Classify recent volume samples."""

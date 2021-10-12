@@ -1,11 +1,10 @@
 """Keyboard input part of the game."""
 
-from queue import Queue
-from .types import Payload
 from .enums import CommandEnum
+from .types import ITCQueue, Payload
 
 
-def keyboard_loop(queue: Queue[Payload]) -> None:
+def keyboard_loop(queue: ITCQueue) -> None:
     """Keyboard input listener loop."""
     while True:
         received = input("> ").strip().casefold()

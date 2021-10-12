@@ -2,8 +2,13 @@
 
 from __future__ import annotations
 
-from typing import TypedDict, NamedTuple, Union, Any
-from .enums import CommandEnum, DirectionEnum, EventEnum, ErrorEnum
+from collections import deque
+from multiprocessing.connection import Connection
+from queue import Queue
+from typing import (Any, Callable, Mapping, NamedTuple, Protocol, TypedDict,
+                    Union)
+
+from .enums import CommandEnum, ErrorEnum, EventEnum, LocationEnum
 
 
 class FERDict(TypedDict):
@@ -32,11 +37,30 @@ class Payload(NamedTuple):
     others: Any = None
 
 
-class NetworkPayload(Payload):
-    """Payload type for the network ITC queue."""
+class EventHandler(Protocol):
+    """Type hint for event_handler."""
 
-    payload: Union[EventEnum, CommandEnum]
-    other: DirectionEnum
+    def __call__(_, *,
+                 event: EventEnum,
+                 location: LocationEnum) -> None:
+        """Call, dummy."""
+        ...
 
 
+class ChannelSetter(Protocol):
+    """Type hint for set_arduino_channel."""
+
+    def __call__(_, channel: int,
+                 state: CommandEnum,
+                 interval: int = 0) -> None:
+        """Call, dummy."""
+        ...
+
+
+ITCQueue = Queue[Payload]
+Queues = Mapping[str, ITCQueue]
+Pipes = Mapping[str, Connection]
 NonNetworkEnum = Union[CommandEnum, EventEnum, ErrorEnum]
+ExpressionClassifier = Callable[[FEREmotions], EventEnum]
+FERList = list[FERDict]
+FloatDeque = deque[float]

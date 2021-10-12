@@ -6,7 +6,6 @@ from configparser import ConfigParser
 from functools import partial
 from multiprocessing.connection import Connection, PipeConnection
 from queue import Empty, Queue
-from typing import Callable, Mapping, Protocol
 
 from .arduino import arduino_loop
 from .enums import (ChannelEnum, CommandEnum, DirectionEnum, ErrorEnum,
@@ -17,26 +16,13 @@ from .expression import expression_loop
 from .keyboard import keyboard_loop
 from .laughter import laughter_loop
 from .network import network_loop
-from .types import Payload
-
-Queues = Mapping[str, Queue[Payload]]
-Pipes = Mapping[str, Connection]
-
-
-class PartialSetChannel(Protocol):
-    """Type hint for set_arduino_channel."""
-
-    def __call__(_, channel: int,
-                 state: CommandEnum,
-                 interval: int = 0) -> None:
-        """Call, dummy."""
-        ...
-
+from .types import (ChannelSetter, EventHandler, ITCQueue, Payload, Pipes,
+                    Queues)
 
 logger = mp.log_to_stderr()
 logger.setLevel(1)
 
-set_arduino_channel: PartialSetChannel
+set_arduino_channel: ChannelSetter
 
 
 def game_loop(config: ConfigParser) -> None:
@@ -51,9 +37,9 @@ def game_loop(config: ConfigParser) -> None:
 
     # IPC and ITC communication constructs
     # Create ITC queues
-    input_queue: Queue[Payload] = Queue()
-    arduino_queue: Queue[Payload] = Queue()
-    network_queue: Queue[Payload] = Queue()
+    input_queue: ITCQueue = Queue()
+    arduino_queue: ITCQueue = Queue()
+    network_queue: ITCQueue = Queue()
     queues: Queues = {
         "ArduinoQueue": arduino_queue,
         "NetworkQueue": network_queue,
@@ -182,7 +168,7 @@ def game_loop(config: ConfigParser) -> None:
 
 
 def handle_ipc_recv(pipes: Pipes,
-                    event_handler: Callable[[EventEnum, LocationEnum], None]) -> None:
+                    event_handler: EventHandler) -> None:
     """Handle inter-process communication in the receive direction."""
     global set_arduino_channel
     ready = mp.connection.wait(pipes.values(), 0)
@@ -204,7 +190,7 @@ def handle_ipc_recv(pipes: Pipes,
 
 
 def handle_itc_recv(queues: Queues,
-                    event_handler: Callable[[EventEnum, LocationEnum], None]) -> None:
+                    event_handler: EventHandler) -> None:
     """Handle inter-thread communication in the receive direction."""
     for name, queue in queues.items():
         try:
@@ -230,8 +216,8 @@ def handle_itc_recv(queues: Queues,
             continue
 
 
-def handle_event(arduino_queue: Queue[Payload],
-                 network_queue: Queue[Payload],
+def handle_event(arduino_queue: ITCQueue,
+                 network_queue: ITCQueue,
                  slower_tickle: int,
                  slow_tickle: int,
                  fast_tickle: int,
@@ -288,7 +274,7 @@ def shutdown(pipes: Pipes, queues: Queues) -> None:
         queue.put_nowait(Payload(CommandEnum.TERMINATE))
 
 
-def switch_channel(queue: Queue[Payload],
+def switch_channel(queue: ITCQueue,
                    channel: int,
                    state: CommandEnum,
                    interval: int = 0) -> None:

@@ -1,17 +1,18 @@
 """Network component of the game."""
 
-import socket
-import selectors
-from functools import partial
-from queue import Queue, Empty
-from .types import Payload
-from .enums import CommandEnum, DirectionEnum, EventEnum, ErrorEnum
 import multiprocessing as mp
+import selectors
+import socket
+from functools import partial
+from queue import Empty
+
+from .enums import CommandEnum, DirectionEnum, ErrorEnum, EventEnum
+from .types import ITCQueue, Payload
 
 logger = mp.get_logger()
 
 
-def network_loop(queue: Queue[Payload],
+def network_loop(queue: ITCQueue,
                  local_ip: str,
                  local_port: int,
                  remote_ip: str,
@@ -62,7 +63,7 @@ def network_loop(queue: Queue[Payload],
     sel.close()
 
 
-def handle_udp_recv(queue: Queue[Payload],
+def handle_udp_recv(queue: ITCQueue,
                     sock: socket.socket,
                     mask: int) -> None:
     """Handle receiving a datagram."""

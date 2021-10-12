@@ -5,14 +5,15 @@ from multiprocessing.connection import Connection
 
 import cv2
 from fer import FER
-from typing import Callable
+
 from .enums import CommandEnum, EventEnum, ErrorEnum
 from .exceptions import CameraError
-from .types import FEREmotions, FERDict
+from .types import FEREmotions, FERList, ExpressionClassifier
 from numpy import ndarray
 from functools import partial
 
 logger = mp.get_logger()
+
 
 def expression_loop(pipe: Connection,
                     camera_index: int,
@@ -65,7 +66,7 @@ def expression_loop(pipe: Connection,
 def get_emotions(
         cap: cv2.VideoCapture,
         detector: FER,
-        classifier: Callable[[FEREmotions], EventEnum]) -> EventEnum:
+        classifier: ExpressionClassifier) -> EventEnum:
     """Capture a frame of video and extract emotions."""
     stat, frame = cap.read()
     if not stat:
@@ -99,7 +100,7 @@ def classify_expression(emotions: FEREmotions,
         return EventEnum.HIGH_INTENSITY_SMILE_DETECTED
 
 
-def do_show(frame: ndarray, emotions_list: list[FERDict]) -> None:
+def do_show(frame: ndarray, emotions_list: FERList) -> None:
     """Visually display camera feed."""
     if len(emotions_list) > 0:
         emotions = emotions_list[0]

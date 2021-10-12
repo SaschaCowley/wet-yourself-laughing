@@ -2,14 +2,14 @@
 import serial
 import multiprocessing as mp
 from .enums import CommandEnum, ErrorEnum
-from .types import Payload
+from .types import Payload, ITCQueue
 
-from queue import Queue, Empty
+from queue import Empty
 
 logger = mp.get_logger()
 
 
-def arduino_loop(queue: Queue[Payload],
+def arduino_loop(queue: ITCQueue,
                  port: str,
                  baudrate: int = 9600) -> None:
     """Arduino communication loop."""
@@ -24,7 +24,7 @@ def arduino_loop(queue: Queue[Payload],
                             dsrdtr=True)
     except (ValueError, serial.SerialException) as e:
         logger.error(e)
-        queue.put(Payload(ErrorEnum.SERIAL_ERROR))
+        queue.put_nowait(Payload(ErrorEnum.SERIAL_ERROR))
         exit()
     ser.write(b'abcd')
     while True:
