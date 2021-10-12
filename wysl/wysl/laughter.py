@@ -11,7 +11,7 @@ import pyaudio
 from matplotlib.backend_bases import CloseEvent
 from matplotlib.figure import Figure
 
-from .enums import CommandEnum, StatusEnum
+from .enums import CommandEnum, EventEnum
 
 logger = mp.get_logger()
 running: bool
@@ -82,7 +82,7 @@ def detect_laughter(stream: pyaudio.Stream,
                     sample_width: int,
                     figure: Figure,
                     hit_volume: float,
-                    num_hits: int, recent_volumes: deque[float]) -> StatusEnum:
+                    num_hits: int, recent_volumes: deque[float]) -> EventEnum:
     """Detect laughter, draw graph, and return."""
     in_data = stream.read(chunk_size)
     volume = audioop.rms(in_data, sample_width)
@@ -94,15 +94,15 @@ def detect_laughter(stream: pyaudio.Stream,
 
 def classify_sound(volumes: deque[float],
                    hit_volume: float,
-                   min_hits: int) -> StatusEnum:
+                   min_hits: int) -> EventEnum:
     """Classify recent volume samples."""
     if volumes.maxlen is not None and len(volumes) < volumes.maxlen:
-        return StatusEnum.NO_LAUGHTER_DETECTED
+        return EventEnum.NO_LAUGHTER_DETECTED
     hits = [volume >= hit_volume for volume in volumes].count(True)
     if hits >= min_hits:
-        return StatusEnum.LAUGHTER_DETECTED
+        return EventEnum.LAUGHTER_DETECTED
     else:
-        return StatusEnum.NO_LAUGHTER_DETECTED
+        return EventEnum.NO_LAUGHTER_DETECTED
 
 
 def do_show(frame: bytes, rms: float, figure: Figure) -> None:

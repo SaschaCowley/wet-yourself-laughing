@@ -1,21 +1,23 @@
 """Game main process code."""
 
+
 from configparser import ConfigParser
 import multiprocessing as mp
 import threading
 from multiprocessing.connection import Connection, PipeConnection
 from queue import Empty, SimpleQueue
-from typing import Mapping, Union, Protocol
+from typing import Mapping, Protocol
 from functools import partial
-
 from .arduino import arduino_loop
-from .enums import CommandEnum, StatusEnum
+from .enums import CommandEnum, EventEnum, ErrorEnum
 from .exceptions import (CameraError, MicrophoneError, SerialError,
-                         UserTerminationException)
+                         NetworkError, UserTerminationException)
 from .expression import expression_loop
 from .laughter import laughter_loop
+from .network import network_loop
+from .types import Payload
 
-Queues = Mapping[str, SimpleQueue[Union[CommandEnum, StatusEnum]]]
+Queues = Mapping[str, SimpleQueue[Payload]]
 Pipes = Mapping[str, Connection]
 
 
@@ -29,13 +31,38 @@ class PartialSetChannel(Protocol):
 
 logger = mp.log_to_stderr()
 logger.setLevel(1)
+
 set_arduino_channel: PartialSetChannel
 
 
 def game_loop(config: ConfigParser) -> None:
     """Run the primary game loop."""
-    global set_arduino_channel
+    global set_arduino_channel, pulse_interval, pulse
+    # Configuration sections for easier access
+    arduino_cfg = config["arduino"]
+    expression_cfg = config['expression']
+    laughter_cfg = config["laughter"]
+    network_cfg = config['network']
+
+    # IPC and ITC communication constructs
+    # Create ITC queues
     input_queue: SimpleQueue[str] = SimpleQueue()
+    arduino_queue: SimpleQueue[Payload] = SimpleQueue()
+    network_queue: SimpleQueue[Payload] = SimpleQueue()
+    queues: Queues = {
+        "ArduinoQueue": arduino_queue,
+        "NetworkQueue": network_queue,
+    }
+
+    # Create IPC pipes
+    expression_pipe_local, expression_pipe_remote = mp.Pipe()
+    laughter_pipe_local, laughter_pipe_remote = mp.Pipe()
+    local_pipes = {
+        "ExpressionPipe": expression_pipe_local,
+        "LaughterPipe": laughter_pipe_local
+    }
+
+    # Create threads
     kb_thread = threading.Thread(
         target=keyboard_loop,
         name="KeyboardThread",
@@ -43,9 +70,7 @@ def game_loop(config: ConfigParser) -> None:
         kwargs={
             "queue": input_queue
         })
-    arduino_queue: SimpleQueue[Union[StatusEnum, CommandEnum]] = SimpleQueue()
-    set_arduino_channel = partial(switch_channel, queue=arduino_queue)
-    arduino_cfg = config["arduino"]
+
     arduino_thread = threading.Thread(
         target=arduino_loop,
         name="ArduinoThread",
@@ -53,13 +78,20 @@ def game_loop(config: ConfigParser) -> None:
             "queue": arduino_queue,
             "port": arduino_cfg.get("port"),
             "baudrate": arduino_cfg.getint("baudrate")
-        }, daemon=True)
-    expression_pipe_local, expression_pipe_remote = mp.Pipe()
-    laughter_pipe_local, laughter_pipe_remote = mp.Pipe()
-    local_pipes = {"ExpressionPipe": expression_pipe_local,
-                   "LaughterPipe": laughter_pipe_local}
-    queues: Queues = {"ArduinoQueue": arduino_queue}
-    expression_cfg = config['expression']
+        })
+
+    network_thread = threading.Thread(
+        target=network_loop,
+        name="NetworkThread",
+        kwargs={
+            "queue": network_queue,
+            "local_ip": network_cfg.get("local_ip"),
+            "local_port": network_cfg.getint("local_port"),
+            "remote_ip": network_cfg.get("remote_ip"),
+            "remote_port": network_cfg.getint("remote_port")
+        })
+
+    # Create processes
     expression_proc = mp.Process(
         name="ExpressionProcess",
         target=expression_loop,
@@ -73,7 +105,7 @@ def game_loop(config: ConfigParser) -> None:
             "medium_threshhold": expression_cfg.getfloat("medium_threshhold"),
             "high_threshhold": expression_cfg.getfloat("high_threshhold")
         })
-    laughter_cfg = config["laughter"]
+
     laughter_proc = mp.Process(
         name="LaughterProcess",
         target=laughter_loop,
@@ -89,15 +121,23 @@ def game_loop(config: ConfigParser) -> None:
             "records": laughter_cfg.getint("records"),
             "hits": laughter_cfg.getint("hits")
         })
-    # processes: list[mp.Process] = [expression_proc, laughter_proc]
+
+    # Partials for convenience
+    set_arduino_channel = partial(switch_channel, queue=arduino_queue)
+
+    # Start and join all threads and processes
     # expression_proc.start()
     # expression_proc.join(0)
-    laughter_proc.start()
-    laughter_proc.join(0)
+    # laughter_proc.start()
+    # laughter_proc.join(0)
     kb_thread.start()
     kb_thread.join(0)
     arduino_thread.start()
     arduino_thread.join(0)
+    network_thread.start()
+    network_thread.join(0)
+
+    # Main event loop
     while True:
         try:
             handle_ipc_recv(local_pipes)
@@ -113,12 +153,15 @@ def game_loop(config: ConfigParser) -> None:
         except SerialError:
             logger.info("Shutting down due to serial error.")
             break
+        except NetworkError:
+            logger.info("Shutting down due to network error.")
+            break
         except UserTerminationException:
             logger.info("Shutting down at user request.")
             break
 
-        if not (expression_proc.is_alive() or laughter_proc.is_alive()):
-            break
+        # if not (expression_proc.is_alive() or laughter_proc.is_alive()):
+            # break
 
     shutdown(local_pipes, queues)
 
@@ -132,17 +175,17 @@ def handle_ipc_recv(pipes: Pipes) -> None:
             continue
         payload = pipe.recv()
         logger.info(f'Received from {pipe}: {payload}')
-        if payload is StatusEnum.CAMERA_ERROR:
+        if payload is ErrorEnum.CAMERA_ERROR:
             logger.error("Problem with the camera.")
             raise CameraError
-        elif payload is StatusEnum.MICROPHONE_ERROR:
+        elif payload is ErrorEnum.MICROPHONE_ERROR:
             logger.error("Problem with the microphone.")
             raise MicrophoneError
         elif payload is CommandEnum.TERMINATE:
             raise UserTerminationException
-        elif payload is StatusEnum.LAUGHTER_DETECTED:
+        elif payload is EventEnum.LAUGHTER_DETECTED:
             set_arduino_channel(channel=1, state=True)
-        elif payload is StatusEnum.NO_LAUGHTER_DETECTED:
+        elif payload is EventEnum.NO_LAUGHTER_DETECTED:
             set_arduino_channel(channel=1, state=False)
 
 
@@ -150,12 +193,15 @@ def handle_itc_recv(queues: Queues) -> None:
     """Handle inter-thread communication in the receive direction."""
     for name, queue in queues.items():
         try:
-            payload = queue.get(block=False)
-            if payload is StatusEnum.SERIAL_ERROR:
+            payload, other = queue.get(block=False)
+            if payload is ErrorEnum.SERIAL_ERROR:
                 logger.error("Problem with the serial device.")
                 raise SerialError
+            elif payload is ErrorEnum.NETWORK_ERROR:
+                logger.error("Problem with the network socket device.")
+                raise NetworkError
             else:
-                queue.put(payload)
+                queue.put(Payload(payload, other))
         except Empty:
             continue
 
@@ -177,7 +223,7 @@ def shutdown(pipes: Pipes, queues: Queues) -> None:
         except (OSError, BrokenPipeError):
             continue
     for name, queue in queues.items():
-        queue.put(CommandEnum.TERMINATE)
+        queue.put(Payload(CommandEnum.TERMINATE))
 
 
 def keyboard_loop(queue: SimpleQueue[str]) -> None:
@@ -187,18 +233,18 @@ def keyboard_loop(queue: SimpleQueue[str]) -> None:
         queue.put(received)
 
 
-def switch_channel(queue: SimpleQueue[Union[StatusEnum, CommandEnum]],
+def switch_channel(queue: SimpleQueue[Payload],
                    channel: int,
                    state: bool) -> None:
     """Set the arduino channel."""
     if channel == 1 and state is True:
-        queue.put(CommandEnum.CHANNEL_1_ON, block=False)
+        queue.put(Payload(CommandEnum.CHANNEL_1_ON), block=False)
     elif channel == 1 and state is False:
-        queue.put(CommandEnum.CHANNEL_1_OFF, block=False)
+        queue.put(Payload(CommandEnum.CHANNEL_1_OFF), block=False)
     elif channel == 2 and state is True:
-        queue.put(CommandEnum.CHANNEL_2_ON, block=False)
+        queue.put(Payload(CommandEnum.CHANNEL_2_ON), block=False)
     elif channel == 2 and state is False:
-        queue.put(CommandEnum.CHANNEL_2_OFF, block=False)
+        queue.put(Payload(CommandEnum.CHANNEL_2_OFF), block=False)
     else:
         raise ValueError(
             f'Unknown combination of channel and state: {channel}, {state}.')

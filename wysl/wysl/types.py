@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TypedDict, Mapping
-from queue import SimpleQueue
-from multiprocessing.connection import Connection
-from enum import Enum
+from typing import TypedDict, NamedTuple, Union, Any
+from .enums import CommandEnum, DirectionEnum, EventEnum, ErrorEnum
 
 
 class FERDict(TypedDict):
@@ -25,3 +23,20 @@ class FEREmotions(TypedDict):
     neutral: float
     sad: float
     surprise: float
+
+
+class Payload(NamedTuple):
+    """Payload type for ITC queues."""
+
+    payload: NonNetworkEnum
+    others: Any = None
+
+
+class NetworkPayload(Payload):
+    """Payload type for the network ITC queue."""
+
+    payload: Union[EventEnum, CommandEnum]
+    other: DirectionEnum
+
+
+NonNetworkEnum = Union[CommandEnum, EventEnum, ErrorEnum]

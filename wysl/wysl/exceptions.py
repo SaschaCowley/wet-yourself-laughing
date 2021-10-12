@@ -15,3 +15,7 @@ class MicrophoneError(Exception):
 
 class SerialError(Exception):
     """Exception to be raised when there is a problem with the camera feed."""
+
+
+class NetworkError(Exception):
+    """Exception to be raised when there is a problem with the camera feed."""

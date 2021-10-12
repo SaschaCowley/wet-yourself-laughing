@@ -1,29 +1,31 @@
 """Arduino communication game component."""
 
-from typing import Union
 import serial
 import multiprocessing as mp
-from .enums import StatusEnum, CommandEnum
+from .enums import CommandEnum, ErrorEnum
+from .types import Payload
 
 from queue import SimpleQueue, Empty
 
 logger = mp.get_logger()
 
 
-def arduino_loop(queue: SimpleQueue[Union[StatusEnum, CommandEnum]],
+def arduino_loop(queue: SimpleQueue[Payload],
                  port: str,
                  baudrate: int = 9600) -> None:
     """Arduino communication loop."""
+    logger.info("Port: %s, baudrate: %d", port, baudrate)
     channels = [False, False]
     try:
         ser = serial.Serial(port=port, baudrate=baudrate, timeout=0)
     except (ValueError, serial.SerialException) as e:
         logger.error(e)
-        queue.put(StatusEnum.SERIAL_ERROR)
+        queue.put(Payload(ErrorEnum.SERIAL_ERROR))
         exit()
+    ser.write(b'abcd')
     while True:
         try:
-            payload = queue.get(block=False)
+            payload, other = queue.get(block=False)
             if payload == CommandEnum.TERMINATE:
                 break
             elif payload == CommandEnum.CHANNEL_1_ON and channels[0] is False:
@@ -39,8 +41,9 @@ def arduino_loop(queue: SimpleQueue[Union[StatusEnum, CommandEnum]],
                 ser.write(b'b')
                 channels[1] = False
             else:
-                queue.put(payload)
+                queue.put(Payload(payload, other))
         except Empty:
             continue
 
+    ser.write(b'abcd')
     ser.close()

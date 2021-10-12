@@ -6,15 +6,13 @@ from multiprocessing.connection import Connection
 import cv2
 from fer import FER
 from typing import Callable
-from .enums import CommandEnum, StatusEnum
+from .enums import CommandEnum, EventEnum, ErrorEnum
 from .exceptions import CameraError
 from .types import FEREmotions, FERDict
 from numpy import ndarray
 from functools import partial
 
 logger = mp.get_logger()
-# detector: FER
-
 
 def expression_loop(pipe: Connection,
                     camera_index: int,
@@ -25,7 +23,8 @@ def expression_loop(pipe: Connection,
                     medium_threshhold: float,
                     high_threshhold: float) -> None:
     """Expression detection loop."""
-    logger.debug(f"Starting: {locals()}")
+    logger.info("Starting: %s", locals())
+    exit()
     classifier = partial(classify_expression,
                          happy_weight=happy_weight,
                          surprise_weight=surprise_weight,
@@ -36,7 +35,7 @@ def expression_loop(pipe: Connection,
     cap = cv2.VideoCapture(camera_index, cv2.CAP_DSHOW)
     if not cap.isOpened():
         logger.error(f'Failed to open stream {camera_index}')
-        pipe.send(StatusEnum.CAMERA_ERROR)
+        pipe.send(ErrorEnum.CAMERA_ERROR)
         exit()
 
     while True:
@@ -50,7 +49,7 @@ def expression_loop(pipe: Connection,
             pipe.send(emotions)
         except CameraError as e:
             logger.error(e.args)
-            pipe.send(StatusEnum.CAMERA_ERROR)
+            pipe.send(ErrorEnum.CAMERA_ERROR)
             break
 
         if cv2.waitKey(1) == ord('q'):
@@ -66,12 +65,12 @@ def expression_loop(pipe: Connection,
 def get_emotions(
         cap: cv2.VideoCapture,
         detector: FER,
-        classifier: Callable[[FEREmotions], StatusEnum]) -> StatusEnum:
+        classifier: Callable[[FEREmotions], EventEnum]) -> EventEnum:
     """Capture a frame of video and extract emotions."""
     stat, frame = cap.read()
     if not stat:
         raise CameraError("Failed to read from camera.")
-    ret = StatusEnum.NO_SMILE_DETECTED
+    ret = EventEnum.NO_SMILE_DETECTED
     frame = cv2.flip(frame, 1)
     emotions = detector.detect_emotions(frame)
     if len(emotions) > 0:
@@ -85,19 +84,19 @@ def classify_expression(emotions: FEREmotions,
                         surprise_weight: float,
                         low_threshhold: float,
                         medium_threshhold: float,
-                        high_threshhold: float) -> StatusEnum:
+                        high_threshhold: float) -> EventEnum:
     """Classify emotions into no, low, medium, or high intensity smiles."""
     weighted_average = ((emotions['happy']*happy_weight
                          + emotions['surprise'] * surprise_weight)
                         / (happy_weight + surprise_weight))
     if weighted_average < low_threshhold:
-        return StatusEnum.NO_SMILE_DETECTED
+        return EventEnum.NO_SMILE_DETECTED
     elif weighted_average < medium_threshhold:
-        return StatusEnum.LOW_INTENSITY_SMILE_DETECTED
+        return EventEnum.LOW_INTENSITY_SMILE_DETECTED
     elif weighted_average < high_threshhold:
-        return StatusEnum.MEDIUM_INTENSITY_SMILE_DETECTED
+        return EventEnum.MEDIUM_INTENSITY_SMILE_DETECTED
     else:
-        return StatusEnum.HIGH_INTENSITY_SMILE_DETECTED
+        return EventEnum.HIGH_INTENSITY_SMILE_DETECTED
 
 
 def do_show(frame: ndarray, emotions_list: list[FERDict]) -> None:
