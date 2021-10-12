@@ -1,7 +1,9 @@
 import socket
 import selectors
 
-address = ("127.0.0.1", 5005)
+address = ("192.168.0.152", 5005)
+# address = ("localhost", 5005)
+# address = ("192.168.0.152", 5005)
 
 sel = selectors.DefaultSelector()
 
@@ -15,7 +17,7 @@ sock.bind(address)
 sock.setblocking(False)
 sel.register(sock, selectors.EVENT_READ, recv)
 
-print(f'Receiving from {address[0]}:{address[1]}')
+print(f'Receiving on {address[0]}:{address[1]}')
 while True:
     try:
         events = sel.select(0)

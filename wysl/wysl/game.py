@@ -138,10 +138,6 @@ def game_loop(config: ConfigParser) -> None:
     arduino_thread.join(0)
     network_thread.start()
     network_thread.join(0)
-    # time.sleep(1)
-    set_arduino_channel(1, CommandEnum.CHANNEL_ON)
-    set_arduino_channel(2, CommandEnum.CHANNEL_OFF)
-    set_arduino_channel(3, CommandEnum.PULSE_CHANNEL, 100)
 
     # Main event loop
     while True:

@@ -1,10 +1,12 @@
 import socket
 
-address = ("127.0.0.1", 5005)
+address = ("192.168.0.155", 5005)
+# address = ("localhost", 5005)
+# address = ("192.168.0.152", 5005)
 
 soc = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
 # soc.bind(address)
-print(f'{address[0]}:{address[1]}')
+print(f'Sending to {address[0]}:{address[1]}')
 
 while True:
     try:
