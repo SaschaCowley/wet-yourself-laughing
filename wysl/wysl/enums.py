@@ -32,6 +32,7 @@ class CommandEnum(Enum):
     """Enumeration of statuses."""
 
     TERMINATE = auto()
+    START = auto()
     CHANNEL_ON = '+'
     CHANNEL_OFF = '-'
     PULSE_CHANNEL = '!'

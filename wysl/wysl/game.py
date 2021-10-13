@@ -199,6 +199,7 @@ def handle_ipc_recv(pipes: Pipes,
 def handle_itc_recv(queues: Queues,
                     event_handler: EventHandler) -> None:
     """Handle inter-thread communication in the receive direction."""
+    global in_game
     for name, queue in queues.items():
         try:
             payload, other = queue.get(block=False)
@@ -213,6 +214,10 @@ def handle_itc_recv(queues: Queues,
                 raise NetworkError
             elif payload is CommandEnum.TERMINATE:
                 raise UserTerminationException
+            elif payload is CommandEnum.START:
+                queues["NetworkQueue"].put(
+                    Payload(EventEnum.START_GAME, DirectionEnum.SEND))
+                in_game = True
             elif isinstance(payload, EventEnum):
                 event_handler(event=payload,
                               location=(LocationEnum.REMOTE

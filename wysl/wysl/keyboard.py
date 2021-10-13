@@ -10,5 +10,7 @@ def keyboard_loop(queue: ITCQueue) -> None:
         received = input("> ").strip().casefold()
         if received == "quit":
             queue.put_nowait(Payload(CommandEnum.TERMINATE))
+        elif received == "start":
+            queue.put(Payload(CommandEnum.START))
         else:
             print("I beg your pardon?")
