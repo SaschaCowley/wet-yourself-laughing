@@ -39,7 +39,7 @@ Pillow==8.3.2
 protobuf==3.18.0
 pyasn1==0.4.8
 pyasn1-modules==0.2.8
-PyAudio == 0.2.11
+PyAudio @ file:///C:/Users/sasch/Documents/work/FIT2082/EMS_project/PyAudio-0.2.11-cp39-cp39-win_amd64.whl
 pycodestyle==2.7.0
 pycparser==2.20
 pydocstyle==6.1.1
@@ -66,7 +66,9 @@ termcolor==1.1.0
 tf-slim==1.1.0
 toml==0.10.2
 tqdm==4.62.3
+types-pyaudio==0.2.3
 typing-extensions==3.7.4.3
 urllib3==1.26.7
+vulture==2.3
 Werkzeug==2.0.1
 wrapt==1.12.1

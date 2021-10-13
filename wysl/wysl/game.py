@@ -21,7 +21,7 @@ from .types import (ChannelSetter, EventHandler, ITCQueue, Payload, Pipes,
 import time
 
 logger = mp.log_to_stderr()
-logger.setLevel(1)
+# logger.setLevel(1)
 
 set_arduino_channel: ChannelSetter
 in_game = False
@@ -218,6 +218,7 @@ def handle_itc_recv(queues: Queues,
                 queues["NetworkQueue"].put(
                     Payload(EventEnum.START_GAME, DirectionEnum.SEND))
                 in_game = True
+                print("Good luck!")
             elif isinstance(payload, EventEnum):
                 event_handler(event=payload,
                               location=(LocationEnum.REMOTE
