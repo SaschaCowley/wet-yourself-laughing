@@ -10,19 +10,21 @@ from queue import Empty, Queue
 from .arduino import arduino_loop
 from .enums import (ChannelEnum, CommandEnum, DirectionEnum, ErrorEnum,
                     EventEnum, LocationEnum)
-from .exceptions import (CameraError, MicrophoneError, NetworkError,
-                         SerialError, UserTerminationException)
+from .exceptions import (CameraError, GameOverException, MicrophoneError,
+                         NetworkError, SerialError, UserTerminationException)
 from .expression import expression_loop
 from .keyboard import keyboard_loop
 from .laughter import laughter_loop
 from .network import network_loop
 from .types import (ChannelSetter, EventHandler, ITCQueue, Payload, Pipes,
                     Queues)
+import time
 
 logger = mp.log_to_stderr()
 logger.setLevel(1)
 
 set_arduino_channel: ChannelSetter
+in_game = False
 
 
 def game_loop(config: ConfigParser) -> None:
@@ -104,12 +106,8 @@ def game_loop(config: ConfigParser) -> None:
         kwargs={
             "pipe": laughter_pipe_remote,
             "microphone_index": laughter_cfg.getint("microphone_index"),
-            "rate": laughter_cfg.getint("rate"),
-            "channels": laughter_cfg.getint("channels"),
-            "width": laughter_cfg.getint("width"),
             "chunk_duration": laughter_cfg.getfloat("chunk_duration"),
-            "mean": laughter_cfg.getfloat("mean"),
-            "stddev": laughter_cfg.getfloat("stddev"),
+            "laughter_threshhold": laughter_cfg.getfloat("threshhold"),
             "records": laughter_cfg.getint("records"),
             "hits": laughter_cfg.getint("hits")
         })
@@ -127,10 +125,10 @@ def game_loop(config: ConfigParser) -> None:
                             balloon_channel=game_cfg.getint("balloon_channel"))
 
     # Start and join all threads and processes
-    expression_proc.start()
-    expression_proc.join(0)
-    # laughter_proc.start()
-    # laughter_proc.join(0)
+    # expression_proc.start()
+    # expression_proc.join(0)
+    laughter_proc.start()
+    laughter_proc.join(0)
     kb_thread.start()
     kb_thread.join(0)
     arduino_thread.start()
@@ -159,6 +157,15 @@ def game_loop(config: ConfigParser) -> None:
             break
         except UserTerminationException:
             logger.info("Shutting down at user request.")
+            break
+        except GameOverException as e:
+            print("+" + "-"*78 + "+",
+                  "|" + " "*78 + "|",
+                  "|" + "GAME OVER".center(78) + "|",
+                  "|" + e.args[0].center(78) + "|",
+                  "|" + " "*78 + "|",
+                  "+" + "-"*78 + "+",
+                  sep='\n')
             break
 
         # if not (expression_proc.is_alive() or laughter_proc.is_alive()):
@@ -196,6 +203,7 @@ def handle_itc_recv(queues: Queues,
         try:
             payload, other = queue.get(block=False)
             if name == "NetworkQueue" and other is DirectionEnum.SEND:
+                queue.put(Payload(payload, other))
                 continue
             if payload is ErrorEnum.SERIAL_ERROR:
                 logger.error("Problem with the serial device.")
@@ -227,15 +235,28 @@ def handle_event(arduino_queue: ITCQueue,
                  event: EventEnum,
                  location: LocationEnum) -> None:
     """Handle events."""
-    global set_arduino_channel
+    global set_arduino_channel, in_game
     # print(f'Balloon={balloon_channel}, feather={feather_channel}')
     # print("Handling event:", event, location)
-    if event is EventEnum.LAUGHTER_DETECTED:
+    if event is EventEnum.START_GAME:
+        in_game = True
+    elif not in_game:
+        return
+    if event is EventEnum.END_GAME and location is LocationEnum.REMOTE:
+        raise UserTerminationException
+    elif event is EventEnum.GAME_OVER:
+        raise GameOverException("YOU WIN!" if location is LocationEnum.REMOTE
+                                else "Better luck next time.")
+    elif event is EventEnum.LAUGHTER_DETECTED:
         set_arduino_channel(channel=balloon_channel,
                             state=CommandEnum.CHANNEL_ON)
+        time.sleep(5)
+        network_queue.put(Payload(EventEnum.GAME_OVER, DirectionEnum.SEND))
+        raise GameOverException("Better luck next time.")
     elif event is EventEnum.NO_LAUGHTER_DETECTED:
-        set_arduino_channel(channel=balloon_channel,
-                            state=CommandEnum.CHANNEL_OFF)
+        # set_arduino_channel(channel=balloon_channel,
+        #                     state=CommandEnum.CHANNEL_OFF)
+        pass
     elif event in (EventEnum.NO_SMILE_DETECTED,
                    EventEnum.LOW_INTENSITY_SMILE_DETECTED,
                    EventEnum.MEDIUM_INTENSITY_SMILE_DETECTED,
@@ -262,6 +283,7 @@ def handle_event(arduino_queue: ITCQueue,
 def shutdown(pipes: Pipes, queues: Queues) -> None:
     """Shutdown the game."""
     global set_arduino_channel
+    print("Shutting down.")
     for i in range(1, 5):
         set_arduino_channel(i, CommandEnum.PULSE_CHANNEL, 0)
         set_arduino_channel(i, CommandEnum.CHANNEL_OFF)

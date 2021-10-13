@@ -21,6 +21,11 @@ class EventEnum(Enum):
     LOW_INTENSITY_SMILE_DETECTED = b'Low intensity smile detected'
     MEDIUM_INTENSITY_SMILE_DETECTED = b'Medium intensity smile detected'
     HIGH_INTENSITY_SMILE_DETECTED = b'High intensity smile detected'
+    GAME_OVER = b'Game over'
+    START_GAME = b'Start game'
+    END_GAME = b'End game'
+    HANDSHAKE = b'Handshake'
+    HANDSHAKE_RECEIVED = b'Hello'
 
 
 class CommandEnum(Enum):

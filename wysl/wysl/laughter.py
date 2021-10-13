@@ -20,19 +20,17 @@ running: bool
 
 def laughter_loop(pipe: Connection,
                   microphone_index: int = 0,
-                  rate: int = 16000,
-                  channels: int = 1,
-                  width: int = 2,
                   chunk_duration: float = 0.05,
-                  mean: float = 400.0,
-                  stddev: float = 2400.0,
+                  laughter_threshhold: float = 2000,
                   records: int = 10,
                   hits: int = 5) -> None:
     """Laughter detection loop."""
     global running
+    width = 2
+    rate = 16000
+    channels = 1
     logger.debug(f"Starting: {locals()}")
     chunk_size = int(rate/(1/chunk_duration))
-    hit_volume = mean+3*stddev
     recent_volumes: FloatDeque = deque(maxlen=records)
     audio = pyaudio.PyAudio()
     stream = audio.open(rate=rate,
@@ -44,8 +42,8 @@ def laughter_loop(pipe: Connection,
     plt.ioff()
     fig, ax = plt.subplots()
     ax.axhspan(
-        -hit_volume, hit_volume, fill=False, linestyle='dotted',
-        label="Threshhold")
+        -laughter_threshhold, laughter_threshhold, fill=False,
+        linestyle='dotted', label="Threshhold")
     ax.plot(np.arange(chunk_size), np.zeros(chunk_size), label="Waveform")
     ax.set_xlim(0, chunk_size-1)
     ax.set_ylim(-(2**(8*width))/2, (2**(8*width))/2)
@@ -63,7 +61,7 @@ def laughter_loop(pipe: Connection,
 
         stat = detect_laughter(
             stream=stream, chunk_size=chunk_size, sample_width=width,
-            figure=fig, hit_volume=hit_volume, num_hits=hits,
+            figure=fig, hit_volume=laughter_threshhold, num_hits=hits,
             recent_volumes=recent_volumes)
         fig.canvas.draw_idle()
         fig.canvas.flush_events()

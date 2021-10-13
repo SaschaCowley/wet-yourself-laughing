@@ -85,7 +85,7 @@ def handle_udp_send(data: bytes,
 
     This is mainly here so we can make a partial of it.
     """
-    print(f'Sending {data!r} to {ip}:{port}')
+    # print(f'Sending {data!r} to {ip}:{port}')
     no = sock.sendto(data, (ip, port))
-    print(no)
+    # print(no)
     return no
