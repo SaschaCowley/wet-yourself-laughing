@@ -2,6 +2,7 @@
 
 import multiprocessing as mp
 import threading
+import time
 from configparser import ConfigParser
 from functools import partial
 from multiprocessing.connection import Connection, PipeConnection
@@ -18,7 +19,7 @@ from .laughter import laughter_loop
 from .network import network_loop
 from .types import (ChannelSetter, EventHandler, ITCQueue, Payload, Pipes,
                     Queues)
-import time
+from .utils import box_strings
 
 logger = mp.log_to_stderr()
 # logger.setLevel(1)
@@ -125,8 +126,8 @@ def game_loop(config: ConfigParser) -> None:
                             balloon_channel=game_cfg.getint("balloon_channel"))
 
     # Start and join all threads and processes
-    # expression_proc.start()
-    # expression_proc.join(0)
+    expression_proc.start()
+    expression_proc.join(0)
     laughter_proc.start()
     laughter_proc.join(0)
     kb_thread.start()
@@ -159,13 +160,7 @@ def game_loop(config: ConfigParser) -> None:
             logger.info("Shutting down at user request.")
             break
         except GameOverException as e:
-            print("+" + "-"*78 + "+",
-                  "|" + " "*78 + "|",
-                  "|" + "GAME OVER".center(78) + "|",
-                  "|" + e.args[0].center(78) + "|",
-                  "|" + " "*78 + "|",
-                  "+" + "-"*78 + "+",
-                  sep='\n')
+            print(box_strings("GAME OVER", e.args[0]))
             break
 
         # if not (expression_proc.is_alive() or laughter_proc.is_alive()):
@@ -289,7 +284,7 @@ def handle_event(arduino_queue: ITCQueue,
 def shutdown(pipes: Pipes, queues: Queues) -> None:
     """Shutdown the game."""
     global set_arduino_channel
-    print("Shutting down.")
+    # print("Shutting down.")
     for i in range(1, 5):
         set_arduino_channel(i, CommandEnum.PULSE_CHANNEL, 0)
         set_arduino_channel(i, CommandEnum.CHANNEL_OFF)

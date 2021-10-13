@@ -1,6 +1,5 @@
 import serial
 from serial.serialutil import SerialException
-from time import sleep
 import sys
 
 if len(sys.argv) < 2:

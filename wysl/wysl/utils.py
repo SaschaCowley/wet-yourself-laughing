@@ -76,3 +76,11 @@ def pprint_config(config: ConfigParser) -> str:
                 f'{f"{option}:".ljust(max_opt_len)}  '
                 f'{config.get(section, option)}')
     return "\n".join(lines)
+
+
+def box_strings(*strings: str, width: int = 80) -> str:
+    """Box some strings centred."""
+    lines = ["+" + "-"*(width-2) + "+", "|" + " "*(width-2) + "|"]
+    lines.extend(f'|  {string.center(width-6)}  |' for string in strings)
+    lines.extend(lines[:2][::-1])
+    return "\n".join(lines)
