@@ -26,7 +26,7 @@ def arduino_loop(queue: ITCQueue,
         logger.error(e)
         queue.put_nowait(Payload(ErrorEnum.SERIAL_ERROR))
         exit()
-    ser.write(b'abcd')
+    ser.write(b'!A0!B0!C0!D0-A-B-C-D')
     while True:
         try:
             payload, other = queue.get(block=False)
@@ -44,4 +44,5 @@ def arduino_loop(queue: ITCQueue,
         except Empty:
             continue
 
+    ser.write(b'!A0!B0!C0!D0-A-B-C-D')
     ser.close()
