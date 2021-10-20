@@ -283,7 +283,7 @@ def handle_event(arduino_queue: ITCQueue,
 
 def shutdown(pipes: Pipes, queues: Queues) -> None:
     """Shutdown the game."""
-    global set_arduino_channel
+    global set_arduino_channel, in_game
     # print("Shutting down.")
     for i in range(1, 5):
         set_arduino_channel(i, CommandEnum.PULSE_CHANNEL, 0)
@@ -295,6 +295,7 @@ def shutdown(pipes: Pipes, queues: Queues) -> None:
             continue
     for name, queue in queues.items():
         queue.put_nowait(Payload(CommandEnum.TERMINATE))
+    in_game = False
 
 
 def switch_channel(queue: ITCQueue,
