@@ -15,7 +15,6 @@ DEFAULT_CONFIG = {
     "laughter": {
         "microphone_index": "0",
         "chunk_duration": "0.05",
-        "threshhold": "2000.0",
         "records": "10",
         "hits": "5",
     },
@@ -39,7 +38,8 @@ DEFAULT_CONFIG = {
 REQUIRED_FIELDS = (
     ("arduino", "port"),
     ("network", "remote_ip"),
-    ("network", "local_ip")
+    ("network", "local_ip"),
+    ("laughter", "threshhold"),
 )
 
 CONFIG_TYPES = (
