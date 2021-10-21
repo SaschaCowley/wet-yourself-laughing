@@ -47,10 +47,14 @@ def expression_loop(pipe: Connection,
 
         try:
             emotions = get_emotions(cap, detector, classifier)
-            pipe.send(emotions)
         except CameraError as e:
             logger.error(e.args)
             pipe.send(ErrorEnum.CAMERA_ERROR)
+
+        try:
+            pipe.send(emotions)
+        except BrokenPipeError:
+            break
             break
 
         if cv2.waitKey(1) == ord('q'):

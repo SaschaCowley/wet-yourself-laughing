@@ -65,7 +65,10 @@ def laughter_loop(pipe: Connection,
             recent_volumes=recent_volumes)
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
-        pipe.send(stat)
+        try:
+            pipe.send(stat)
+        except BrokenPipeError:
+            break
 
     if not running:
         pipe.send(CommandEnum.TERMINATE)
