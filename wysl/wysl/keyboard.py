@@ -10,6 +10,7 @@ def keyboard_loop(queue: ITCQueue) -> None:
         received = input("> ").strip().casefold()
         if received == "quit":
             queue.put_nowait(Payload(CommandEnum.TERMINATE))
+            break
         elif received == "start":
             queue.put(Payload(CommandEnum.START))
         else:
