@@ -32,6 +32,7 @@ DEFAULT_CONFIG = {
         "faster_tickle": "100",
         "feather_channel": "1",
         "balloon_channel": "2",
+        "squeeze_duration": 5.0,
     }
 }
 
@@ -66,7 +67,8 @@ CONFIG_TYPES = (
     ("game", "fast_tickle", "int"),
     ("game", "faster_tickle", "int"),
     ("game", "feather_channel", "int"),
-    ("game", "balloon_channel", "int")
+    ("game", "balloon_channel", "int"),
+    ("game", "squeeze_duration", "float"),
 )
 
 

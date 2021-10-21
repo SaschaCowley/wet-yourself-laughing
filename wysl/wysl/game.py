@@ -115,15 +115,18 @@ def game_loop(config: ConfigParser) -> None:
 
     # Partials for convenience
     set_arduino_channel = partial(switch_channel, arduino_queue)
-    event_handler = partial(handle_event,
-                            arduino_queue=arduino_queue,
-                            network_queue=network_queue,
-                            slower_tickle=game_cfg.getint("slower_tickle"),
-                            slow_tickle=game_cfg.getint("slow_tickle"),
-                            fast_tickle=game_cfg.getint("fast_tickle"),
-                            faster_tickle=game_cfg.getint("faster_tickle"),
-                            feather_channel=game_cfg.getint("feather_channel"),
-                            balloon_channel=game_cfg.getint("balloon_channel"))
+    event_handler = partial(
+        handle_event,
+        arduino_queue=arduino_queue,
+        network_queue=network_queue,
+        slower_tickle=game_cfg.getint("slower_tickle"),
+        slow_tickle=game_cfg.getint("slow_tickle"),
+        fast_tickle=game_cfg.getint("fast_tickle"),
+        faster_tickle=game_cfg.getint("faster_tickle"),
+        feather_channel=game_cfg.getint("feather_channel"),
+        balloon_channel=game_cfg.getint("balloon_channel"),
+        squeeze_duration=game_cfg.getfloat("squeeze_duration")
+    )
 
     # Start and join all threads and processes
     expression_proc.start()
@@ -233,6 +236,7 @@ def handle_event(arduino_queue: ITCQueue,
                  faster_tickle: int,
                  feather_channel: int,
                  balloon_channel: int,
+                 squeeze_duration: float,
                  event: EventEnum,
                  location: LocationEnum) -> None:
     """Handle events."""
@@ -251,7 +255,7 @@ def handle_event(arduino_queue: ITCQueue,
     elif event is EventEnum.LAUGHTER_DETECTED:
         set_arduino_channel(channel=balloon_channel,
                             state=CommandEnum.CHANNEL_ON)
-        time.sleep(5)
+        time.sleep(squeeze_duration)
         network_queue.put(Payload(EventEnum.GAME_OVER, DirectionEnum.SEND))
         raise GameOverException("Better luck next time.")
     elif event is EventEnum.NO_LAUGHTER_DETECTED:
