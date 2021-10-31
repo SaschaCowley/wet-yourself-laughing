@@ -1,10 +1,15 @@
-"""Arduino communication game component."""
-import serial
-import multiprocessing as mp
-from .enums import CommandEnum, ErrorEnum
-from .types import Payload, ITCQueue
+"""Arduino communication game component.
 
+Communication with the arduino is handled by `arduino_loop`, which should be
+run as a thread.
+"""
+import multiprocessing as mp
 from queue import Empty
+
+import serial
+
+from .enums import CommandEnum, ErrorEnum
+from .types import ITCQueue, Payload
 
 logger = mp.get_logger()
 
@@ -12,8 +17,16 @@ logger = mp.get_logger()
 def arduino_loop(queue: ITCQueue,
                  port: str,
                  baudrate: int = 9600) -> None:
-    """Arduino communication loop."""
+    """Handle communication with the Arduino.
+
+    Args:
+        queue (ITCQueue): Queue object to use for inter-thread communication.
+        port (str): Identifier of the port to which the Arduino is connected.
+        baudrate (int, optional): Baudrate of the connection to establish.
+            Defaults to 9600.
+    """
     logger.info("Port: %s, baudrate: %d", port, baudrate)
+
     try:
         # dsrdtr=True seems to fix the problem where reads within 1-2 seconds
         # of opening the port fail silently. See
@@ -26,6 +39,8 @@ def arduino_loop(queue: ITCQueue,
         logger.error(e)
         queue.put_nowait(Payload(ErrorEnum.SERIAL_ERROR))
         exit()
+
+    # Disable pulsing of relays and turn all relays off.
     ser.write(b'!A0!B0!C0!D0-A-B-C-D')
     while True:
         try:
@@ -44,5 +59,7 @@ def arduino_loop(queue: ITCQueue,
         except Empty:
             continue
 
+    # Cleanup
+    # Disable pulsing of relays and turn all relays off.
     ser.write(b'!A0!B0!C0!D0-A-B-C-D')
     ser.close()
