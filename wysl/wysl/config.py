@@ -2,7 +2,7 @@
 
 from configparser import ConfigParser
 
-DEFAULT_CONFIG = {
+DEFAULT_CONFIG: dict[str, dict[str, str]] = {
     "expression": {
         "camera_index": "0",
         "mtcnn": "False",
@@ -32,7 +32,7 @@ DEFAULT_CONFIG = {
         "faster_tickle": "100",
         "feather_channel": "1",
         "balloon_channel": "2",
-        "squeeze_duration": 5.0,
+        "squeeze_duration": "5.0",
     }
 }
 

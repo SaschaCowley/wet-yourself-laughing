@@ -1,11 +1,13 @@
 """Entry-point for Wet Yourself Laughing."""
 
 import cmd
+from configparser import ConfigParser
+from configparser import Error as ConfigParserError
+
 import wysl
 import wysl.game
-from wysl.setup import setup
-from configparser import ConfigParser, Error as ConfigParserError
 from wysl.config import DEFAULT_CONFIG, validate_config
+from wysl.setup import setup
 from wysl.utils import pprint_config
 
 config = ConfigParser()
