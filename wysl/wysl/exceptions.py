@@ -18,8 +18,8 @@ class MicrophoneError(Exception):
 
 
 class SerialError(Exception):
-    """Exception to be raised when there is a problem with the camera feed."""
+    """Exception to be raised when there is a problem connecting to Arduino."""
 
 
 class NetworkError(Exception):
-    """Exception to be raised when there is a problem with the camera feed."""
+    """Exception to be raised when there is a problem with the network."""

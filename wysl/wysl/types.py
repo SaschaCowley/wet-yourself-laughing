@@ -1,4 +1,7 @@
-"""Type annotations."""
+"""Type annotations.
+
+These should just be type annotations for use throughout the code base.
+"""
 
 from __future__ import annotations
 
