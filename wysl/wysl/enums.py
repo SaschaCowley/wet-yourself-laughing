@@ -1,4 +1,8 @@
-"""Enumerations."""
+"""Enumerations.
+
+Some of these have auto() values, but some of them have specific bytes values
+so they can be used as UDP commands.
+"""
 
 from enum import Enum, auto
 
@@ -13,7 +17,11 @@ class ErrorEnum(Enum):
 
 
 class EventEnum(Enum):
-    """Enumeration of statuses."""
+    """Enumeration of game events.
+
+    These values are given as bytes so they can easily be used as the contents
+    of UDP packets.
+    """
 
     NO_LAUGHTER_DETECTED = b'No laughter detected'
     LAUGHTER_DETECTED = b'Laughter detected'
@@ -29,7 +37,12 @@ class EventEnum(Enum):
 
 
 class CommandEnum(Enum):
-    """Enumeration of statuses."""
+    """Enumeration of inter-thread/process communication commands.
+
+    The values CHANNEL_ON, CHANNEL_OFF, PULSE_CHANNEL and QUERY_CHANNEL are
+    given as bytes so that Arduino controller commands can be easily composed
+    from their values.
+    """
 
     TERMINATE = auto()
     START = auto()
@@ -40,7 +53,11 @@ class CommandEnum(Enum):
 
 
 class ChannelEnum(Enum):
-    """Enumeration of relay channels."""
+    """Enumeration of relay channels.
+
+    These values are given as bytes so that Arduino controller commands can be
+    easily composed from their values.
+    """
 
     CHANNEL_1 = 'A'
     CHANNEL_2 = 'B'
@@ -49,14 +66,14 @@ class ChannelEnum(Enum):
 
 
 class DirectionEnum(Enum):
-    """Enumeration of statuses."""
+    """Enumeration of directions for UDP communications."""
 
     SEND = auto()
     RECV = auto()
 
 
 class LocationEnum(Enum):
-    """Enumeration of locations."""
+    """Enumeration of origins for game events."""
 
     LOCAL = auto()
     REMOTE = auto()
