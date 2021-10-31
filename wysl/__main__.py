@@ -54,6 +54,3 @@ class WyslShell(cmd.Cmd):
 
 if __name__ == '__main__':
     WyslShell().cmdloop()
-    # setup(config)
-    # wysl.game.game_loop(config)
-    # print(pprint_config(config))
