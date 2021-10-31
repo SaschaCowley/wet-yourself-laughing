@@ -1,6 +1,14 @@
+"""Tiny controller communication terminal.
+
+This should be run from the command line with the first and only argument being
+the serial port to which the Arduino is connected. For details about commands
+accepted by the Arduino code, see `controller/controller.ino`.
+"""
+
+import sys
+
 import serial
 from serial.serialutil import SerialException
-import sys
 
 if len(sys.argv) < 2:
     print("You need to provide the address of the Arduino.")
