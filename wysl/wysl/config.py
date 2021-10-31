@@ -1,4 +1,18 @@
-"""Configuration game component."""
+"""Configuration game component.
+
+Constants:
+    DEFAULT_CONFIG (dict[str, dict[str, str]]): Dictionary of default
+        configuration values to be passed to a ConfigParser.
+    REQUIRED_FIELDS (tuple[tuple[str, str], ...]): Tuple of tuples that
+        represent the section and key (respectively) of any configuration
+        values that must be provided by the user.
+    CONFIG_TYPES (tuple[tuple[str, str, str], ...]): Tuple of tuples of strings
+        that represent the section, key and type of all configuration fields.
+
+Functions:
+    validate_config: Validates a ConfigParser object against the above constant
+        configuration definitions.
+"""
 
 from configparser import ConfigParser
 
@@ -36,14 +50,14 @@ DEFAULT_CONFIG: dict[str, dict[str, str]] = {
     }
 }
 
-REQUIRED_FIELDS = (
+REQUIRED_FIELDS: tuple[tuple[str, str], ...] = (
     ("arduino", "port"),
     ("network", "remote_ip"),
     ("network", "local_ip"),
     ("laughter", "threshhold"),
 )
 
-CONFIG_TYPES = (
+CONFIG_TYPES: tuple[tuple[str, str, str], ...] = (
     ("expression", "camera_index", "int"),
     ("expression", "mtcnn", "bool"),
     ("expression", "happy_weight", "int"),
@@ -73,7 +87,16 @@ CONFIG_TYPES = (
 
 
 def validate_config(config: ConfigParser) -> None:
-    """Validate the configuration."""
+    """Validate the configuration.
+
+    Validates a given configuration object (items, types) against the required
+    fields and types. Returns None if the passed ConfigParser is valid, raises
+    any of configparser's exceptions if invalid (exception raised depends on
+    the problem).
+
+    Args:
+        config (ConfigParser): The ConfigParser object to validate.
+    """
     for section, key, type in CONFIG_TYPES:
         if type == "str":
             config.get(section, key)
