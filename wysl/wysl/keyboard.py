@@ -5,7 +5,12 @@ from .types import ITCQueue, Payload
 
 
 def keyboard_loop(queue: ITCQueue) -> None:
-    """Keyboard input listener loop."""
+    """Keyboard input listener loop.
+
+    Args:
+        queue (ITCQueue): Queue object to be used for inter-thread
+            communication.
+    """
     while True:
         received = input("> ").strip().casefold()
         if received == "quit":

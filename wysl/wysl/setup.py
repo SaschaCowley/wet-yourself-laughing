@@ -1,17 +1,19 @@
 """Setup component of the game."""
 
+import audioop
 import cmd
+import socket
+import statistics
 from collections import namedtuple
 from configparser import ConfigParser
 from typing import Any, Optional
-from serial.tools.list_ports import comports
-import serial
-import audioop
-import statistics
+
 import cv2
 import pyaudio
-import socket
-from .utils import elicit_ipv4_address, elicit_float
+import serial
+from serial.tools.list_ports import comports
+
+from .utils import elicit_float, elicit_ipv4_address
 
 Camera = namedtuple('Camera', ('port', 'width', 'height', 'frame_rate'))
 Microphone = namedtuple(
